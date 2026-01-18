@@ -40,6 +40,7 @@ class ActiveCommunity {
   final String? description;
   final String? logo;
   final String? color;
+  final bool isDefault;
   final List<ActiveCommunityMember> members;
 
   ActiveCommunity({
@@ -49,8 +50,18 @@ class ActiveCommunity {
     this.description,
     this.logo,
     this.color,
+    this.isDefault = false,
     this.members = const [],
   });
+
+  /// Check if user is Admin
+  bool get isAdmin => role == 'ADMIN';
+
+  /// Check if user is Co-Admin
+  bool get isCoAdmin => role == 'CO_ADMIN';
+
+  /// Check if user has admin privileges (Admin or Co-Admin)
+  bool get hasAdminPrivileges => isAdmin || isCoAdmin;
 
   factory ActiveCommunity.fromJson(Map<String, dynamic> json) {
     final membersList = json['members'] as List<dynamic>? ?? [];
@@ -61,6 +72,7 @@ class ActiveCommunity {
       description: json['description'],
       logo: json['logo'],
       color: json['color'],
+      isDefault: json['isDefault'] ?? false,
       members: membersList
           .map((m) => ActiveCommunityMember.fromJson(m as Map<String, dynamic>))
           .toList(),

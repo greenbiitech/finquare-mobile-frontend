@@ -679,6 +679,40 @@ class WalletRepository {
     );
     return WalletResponse.fromJson(response.data);
   }
+
+  // ============================================
+  // WITHDRAWAL ACCOUNT MANAGEMENT
+  // ============================================
+
+  /// Get saved withdrawal account
+  Future<WithdrawalAccount?> getWithdrawalAccount() async {
+    try {
+      final response = await _apiClient.get(ApiEndpoints.withdrawalAccountMe);
+      final data = response.data['data'];
+      if (data == null) return null;
+      return WithdrawalAccount.fromJson(data as Map<String, dynamic>);
+    } catch (e) {
+      // Return null if not found (404) or any other error
+      return null;
+    }
+  }
+
+  /// Save withdrawal account
+  Future<WithdrawalAccount> saveWithdrawalAccount(
+    CreateWithdrawalAccountRequest request,
+  ) async {
+    final response = await _apiClient.post(
+      ApiEndpoints.withdrawalAccount,
+      data: request.toJson(),
+    );
+    final data = response.data['data'] ?? response.data;
+    return WithdrawalAccount.fromJson(data as Map<String, dynamic>);
+  }
+
+  /// Delete withdrawal account
+  Future<void> deleteWithdrawalAccount() async {
+    await _apiClient.delete(ApiEndpoints.withdrawalAccount);
+  }
 }
 
 /// Bank Model
@@ -694,6 +728,75 @@ class Bank {
       name: json['bankName'] ?? json['name'] ?? '',
     );
   }
+}
+
+/// Withdrawal Account Model
+class WithdrawalAccount {
+  final String? id;
+  final String userId;
+  final String bankCode;
+  final String bankName;
+  final String accountNumber;
+  final String accountName;
+  final DateTime? dateCreated;
+  final DateTime? dateUpdated;
+
+  const WithdrawalAccount({
+    this.id,
+    required this.userId,
+    required this.bankCode,
+    required this.bankName,
+    required this.accountNumber,
+    required this.accountName,
+    this.dateCreated,
+    this.dateUpdated,
+  });
+
+  factory WithdrawalAccount.fromJson(Map<String, dynamic> json) {
+    return WithdrawalAccount(
+      id: json['id'],
+      userId: json['userId'] ?? '',
+      bankCode: json['bankCode'] ?? '',
+      bankName: json['bankName'] ?? '',
+      accountNumber: json['accountNumber'] ?? '',
+      accountName: json['accountName'] ?? '',
+      dateCreated: json['dateCreated'] != null
+          ? DateTime.tryParse(json['dateCreated'])
+          : null,
+      dateUpdated: json['dateUpdated'] != null
+          ? DateTime.tryParse(json['dateUpdated'])
+          : null,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'bankCode': bankCode,
+    'bankName': bankName,
+    'accountNumber': accountNumber,
+    'accountName': accountName,
+  };
+}
+
+/// Create Withdrawal Account Request
+class CreateWithdrawalAccountRequest {
+  final String bankCode;
+  final String bankName;
+  final String accountNumber;
+  final String accountName;
+
+  const CreateWithdrawalAccountRequest({
+    required this.bankCode,
+    required this.bankName,
+    required this.accountNumber,
+    required this.accountName,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'bankCode': bankCode,
+    'bankName': bankName,
+    'accountNumber': accountNumber,
+    'accountName': accountName,
+  };
 }
 
 /// Resolve Account Response Model

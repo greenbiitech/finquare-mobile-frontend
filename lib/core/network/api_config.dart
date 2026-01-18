@@ -112,4 +112,8 @@ class ApiEndpoints {
   static const String walletWebhookLogs = '/wallet/webhook-logs';
   static const String walletDebug = '/wallet/debug-wallet';
   static const String walletTestDeposit = '/wallet/test-deposit';
+
+  // Withdrawal Account
+  static const String withdrawalAccount = '/withdrawals/account';
+  static const String withdrawalAccountMe = '/withdrawals/account/me';
 }

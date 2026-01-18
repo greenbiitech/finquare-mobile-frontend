@@ -41,7 +41,7 @@ import 'package:finsquare_mobile_app/features/wallet/presentation/pages/face_ver
 import 'package:finsquare_mobile_app/features/wallet/presentation/pages/confirm_photo_page.dart';
 import 'package:finsquare_mobile_app/features/wallet/presentation/pages/proof_of_address_page.dart';
 import 'package:finsquare_mobile_app/features/wallet/presentation/pages/top_up_page.dart';
-import 'package:finsquare_mobile_app/features/wallet/presentation/pages/withdraw_page.dart';
+import 'package:finsquare_mobile_app/features/wallet/presentation/pages/withdrawal_success_page.dart';
 import 'package:finsquare_mobile_app/features/wallet/data/wallet_repository.dart';
 import 'package:finsquare_mobile_app/features/hub/presentation/pages/create_hub_page.dart';
 import 'package:finsquare_mobile_app/features/dues/presentation/pages/dues_welcome_page.dart';
@@ -99,6 +99,7 @@ abstract class AppRoutes {
   static const String walletSuccess = '/wallet-success';
   static const String topUp = '/top-up';
   static const String withdraw = '/withdraw';
+  static const String withdrawalSuccess = '/withdrawal-success';
 
   // Hub routes
   static const String createHub = '/create-hub';
@@ -433,9 +434,9 @@ GoRouter appRouter(Ref ref) {
         builder: (context, state) => const TopUpPage(),
       ),
       GoRoute(
-        path: AppRoutes.withdraw,
-        name: 'withdraw',
-        builder: (context, state) => const WithdrawPage(),
+        path: AppRoutes.withdrawalSuccess,
+        name: 'withdrawalSuccess',
+        builder: (context, state) => const WithdrawalSuccessPage(),
       ),
       // Hub routes
       GoRoute(

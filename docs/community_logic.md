@@ -361,15 +361,36 @@ Each community can have **one Community Wallet** that serves as the central fund
 | Requirement | Description |
 |-------------|-------------|
 | **Admin's Personal Wallet** | Admin must have their personal wallet setup first |
-| **2 Co-Admin Signatories** | Admin must designate 2 Co-Admins as signatories |
+| **At least 2 Co-Admins** | Community must have at least 2 Co-Admins before wallet can be created |
 
 > **Note**: A community can exist without a wallet. Admin doesn't need Co-Admins to create the community, but must have at least 2 Co-Admins to setup the wallet signatories.
 
 ### Signatory System
-- **Purpose**: Record-keeping and accountability (not approval-based)
-- **Count**: Exactly 2 Co-Admins must be designated as signatories
-- **Approval**: Signatories do NOT need to approve withdrawals
-- **Flexibility**: Signatories can leave the community freely - doesn't affect wallet operations
+- **Purpose**: Multi-signature approval for withdrawals
+- **Signatory A**: Always the **Admin** (pre-filled, cannot be changed)
+- **Signatory B**: Selected from available **Co-Admins**
+- **Approval Required**: Withdrawals require approval based on configured rules
+- **Flexibility**: If a signatory Co-Admin leaves, Admin must designate a new signatory
+
+### Approval Rules
+When creating the community wallet, Admin configures approval rules that determine how many signatories must approve a withdrawal:
+
+| Rule | Description |
+|------|-------------|
+| **30%** | At least 30% of signatories must approve |
+| **50%** | At least 50% of signatories must approve |
+| **75%** | At least 75% of signatories must approve |
+| **100%** | All signatories must approve |
+
+> **Example with 2 signatories**:
+> - 50% or less → 1 signatory approval needed
+> - 75% or 100% → Both signatories must approve
+
+### Transaction PIN
+- Community wallet has its own **separate Transaction PIN**
+- This PIN is different from the Admin's personal wallet PIN
+- The PIN is set during wallet creation (4 digits)
+- Required when initiating withdrawals from community wallet
 
 ### Fund Sources
 Money flows INTO the Community Wallet from:
@@ -381,18 +402,19 @@ Money flows INTO the Community Wallet from:
 ### Withdrawals
 | Aspect | Rule |
 |--------|------|
-| **Who can withdraw** | Admin only |
+| **Who can initiate** | Admin only |
+| **Approval requirement** | Based on configured approval rules |
 | **Withdrawal limits** | None |
-| **Signatory approval** | Not required |
 | **Frequency limits** | None |
 
 ### Visibility & Access
 
-| Aspect | Admin | Co-Admin | Member |
-|--------|:-----:|:--------:|:------:|
-| View wallet balance | ✅ | ✅ | ❌ |
-| View transaction history | ✅ | ✅ | ❌ |
-| Make withdrawals | ✅ | ❌ | ❌ |
+| Aspect | Admin | Co-Admin (Signatory) | Co-Admin (Non-Signatory) | Member |
+|--------|:-----:|:--------------------:|:------------------------:|:------:|
+| View wallet balance | ✅ | ✅ | ✅ | ❌ |
+| View transaction history | ✅ | ✅ | ✅ | ❌ |
+| Initiate withdrawals | ✅ | ❌ | ❌ | ❌ |
+| Approve withdrawals | ✅ | ✅ | ❌ | ❌ |
 
 > Regular members cannot see the community wallet balance or transaction history at all.
 
@@ -400,17 +422,195 @@ Money flows INTO the Community Wallet from:
 | Rule | Description |
 |------|-------------|
 | **One wallet per community** | No multiple wallets - single total balance |
-| **Signatory changes** | Not needed - signatories can leave freely |
+| **Minimum 2 Co-Admins** | Must have at least 2 Co-Admins before creating wallet |
+| **Signatory replacement** | If signatory leaves, Admin must designate replacement |
 | **No member visibility** | Wallet is completely hidden from regular members |
 
-### Wallet Creation Flow
+---
+
+### Wallet Creation Flow (Detailed)
+
+The community wallet creation follows a multi-step flow:
+
+#### Step 1: Wallet Checklist Screen
+Before creating the wallet, the user sees a checklist of requirements:
+
 ```
-Admin wants to create Community Wallet
+┌─────────────────────────────────────┐
+│         Wallet Checklist            │
+├─────────────────────────────────────┤
+│                                     │
+│  ☐ Set up Signatories              │
+│    Select who can approve           │
+│    withdrawals                      │
+│                                     │
+│  ☐ Set up Approval Rules           │
+│    Configure approval percentage    │
+│                                     │
+│  ☐ Create Transaction PIN          │
+│    Secure your community wallet     │
+│                                     │
+│         [Activate Wallet]           │
+│                                     │
+└─────────────────────────────────────┘
+```
+
+#### Step 2: Set up Signatories Screen
+Admin configures the signatories for the wallet:
+
+```
+┌─────────────────────────────────────┐
+│       Set up Signatories            │
+├─────────────────────────────────────┤
+│                                     │
+│  Signatory A (Admin)                │
+│  ┌───────────────────────────────┐  │
+│  │ 👤 Admin Name (You)           │  │
+│  │    [Pre-filled, Cannot edit]  │  │
+│  └───────────────────────────────┘  │
+│                                     │
+│  Signatory B                        │
+│  ┌───────────────────────────────┐  │
+│  │ [Select a Co-Admin ▼]         │  │
+│  │    Tap to select              │  │
+│  └───────────────────────────────┘  │
+│                                     │
+│            [Continue]               │
+│                                     │
+└─────────────────────────────────────┘
+```
+
+**Signatory Selection Rules:**
+- **Signatory A**: Always the Admin (pre-filled, non-editable)
+- **Signatory B**: Must be selected from available Co-Admins
+- If community has **no Co-Admins**: Show message with button to navigate to Co-Admin management
+
+#### Step 3: Select Co-Admins Modal
+When tapping "Select a Co-Admin", a modal appears:
+
+```
+┌─────────────────────────────────────┐
+│        Select a Co-Admin            │
+├─────────────────────────────────────┤
+│                                     │
+│  ○ John Doe                         │
+│    Co-Admin                         │
+│                                     │
+│  ○ Jane Smith                       │
+│    Co-Admin                         │
+│                                     │
+│  ○ Mike Johnson                     │
+│    Co-Admin                         │
+│                                     │
+│            [Select]                 │
+│                                     │
+└─────────────────────────────────────┘
+```
+
+**If No Co-Admins Exist:**
+```
+┌─────────────────────────────────────┐
+│        Select a Co-Admin            │
+├─────────────────────────────────────┤
+│                                     │
+│    😕 No Co-Admins Available        │
+│                                     │
+│    You need at least 2 Co-Admins    │
+│    to create a community wallet.    │
+│                                     │
+│    [Manage Co-Admins]               │
+│                                     │
+└─────────────────────────────────────┘
+```
+
+#### Step 4: Set up Approval Rules Screen
+Admin configures what percentage of signatories must approve withdrawals:
+
+```
+┌─────────────────────────────────────┐
+│      Set up Approval Rules          │
+├─────────────────────────────────────┤
+│                                     │
+│  Select approval percentage for     │
+│  fund release:                      │
+│                                     │
+│  ○ 30%                              │
+│  ● 50%  ← Selected                  │
+│  ○ 75%                              │
+│  ○ 100%                             │
+│                                     │
+│  ℹ️ With 2 signatories:             │
+│     50% = 1 approval needed         │
+│                                     │
+│            [Continue]               │
+│                                     │
+└─────────────────────────────────────┘
+```
+
+#### Step 5: Create Transaction PIN Screen
+Admin creates a 4-digit PIN for the community wallet:
+
+```
+┌─────────────────────────────────────┐
+│     Create Transaction PIN          │
+├─────────────────────────────────────┤
+│                                     │
+│  Create a 4-digit PIN to secure     │
+│  your community wallet transactions │
+│                                     │
+│       ○  ○  ○  ○                    │
+│                                     │
+│       [Number Keypad]               │
+│                                     │
+└─────────────────────────────────────┘
+```
+
+#### Step 6: Confirm Transaction PIN Screen
+User re-enters the PIN to confirm:
+
+```
+┌─────────────────────────────────────┐
+│     Confirm Transaction PIN         │
+├─────────────────────────────────────┤
+│                                     │
+│  Re-enter your PIN to confirm       │
+│                                     │
+│       ●  ●  ○  ○                    │
+│                                     │
+│       [Number Keypad]               │
+│                                     │
+└─────────────────────────────────────┘
+```
+
+#### Step 7: Success Screen
+After successful wallet creation:
+
+```
+┌─────────────────────────────────────┐
+│                                     │
+│            ✅                       │
+│                                     │
+│     Community Wallet Created!       │
+│                                     │
+│  Your community wallet is now       │
+│  active and ready to receive funds. │
+│                                     │
+│        [Go to Wallet]               │
+│                                     │
+└─────────────────────────────────────┘
+```
+
+---
+
+### Complete Wallet Creation Flow Diagram
+
+```
+Admin taps "Activate Wallet"
               │
               ▼
     ┌─────────────────────┐
     │ Personal wallet     │
-    │ setup?              │
+    │ activated?          │
     └──────────┬──────────┘
                │
        ┌───────┴───────┐
@@ -419,8 +619,8 @@ Admin wants to create Community Wallet
       Yes              No
        │               │
        ▼               ▼
-  Continue         Must setup personal
-       │           wallet first
+  Continue         Redirect to personal
+       │           wallet activation
        ▼
     ┌─────────────────────┐
     │ Has 2+ Co-Admins?   │
@@ -432,12 +632,98 @@ Admin wants to create Community Wallet
       Yes              No
        │               │
        ▼               ▼
-  Select 2          Must promote at
-  signatories       least 2 Co-Admins
+  Show Wallet      Show "No Co-Admins"
+  Checklist        message with link
+       │           to manage Co-Admins
+       ▼
+  Set up Signatories
+  (Admin pre-filled)
        │
        ▼
-  Wallet Created ✅
+  Select Co-Admin
+  (Modal)
+       │
+       ▼
+  Set up Approval Rules
+  (30%/50%/75%/100%)
+       │
+       ▼
+  Create Transaction PIN
+  (4 digits)
+       │
+       ▼
+  Confirm Transaction PIN
+       │
+       ▼
+  Success! Wallet Created ✅
+       │
+       ▼
+  Navigate to Wallet Dashboard
 ```
+
+---
+
+### Withdrawal Flow with Approval
+
+When Admin initiates a withdrawal from the community wallet:
+
+```
+Admin initiates withdrawal
+              │
+              ▼
+    ┌─────────────────────┐
+    │ Enter withdrawal    │
+    │ details (amount,    │
+    │ destination)        │
+    └──────────┬──────────┘
+               │
+               ▼
+    ┌─────────────────────┐
+    │ Enter Transaction   │
+    │ PIN                 │
+    └──────────┬──────────┘
+               │
+               ▼
+    ┌─────────────────────┐
+    │ Create pending      │
+    │ withdrawal request  │
+    └──────────┬──────────┘
+               │
+               ▼
+    ┌─────────────────────┐
+    │ Notify signatories  │
+    │ (push notification) │
+    └──────────┬──────────┘
+               │
+               ▼
+    ┌─────────────────────┐
+    │ Wait for required   │
+    │ approvals           │
+    └──────────┬──────────┘
+               │
+       ┌───────┴───────┐
+       │               │
+       ▼               ▼
+   Approved         Rejected
+       │               │
+       ▼               ▼
+   Process         Cancel
+   withdrawal      request
+       │               │
+       ▼               ▼
+   Notify all      Notify all
+   signatories     signatories
+```
+
+### Approval Notifications
+
+| Event | Recipient | Notification |
+|-------|-----------|--------------|
+| Withdrawal requested | All signatories | "{Admin} requested a withdrawal of ₦{amount} from {community} wallet" |
+| Signatory approves | Admin | "{Signatory} approved your withdrawal request" |
+| Signatory rejects | Admin | "{Signatory} rejected your withdrawal request" |
+| Withdrawal processed | All signatories | "Withdrawal of ₦{amount} has been processed" |
+| Withdrawal cancelled | All signatories | "Withdrawal request has been cancelled" |
 
 ---
 

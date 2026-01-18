@@ -10,13 +10,21 @@ import 'package:finsquare_mobile_app/config/routes/app_router.dart';
 import 'package:finsquare_mobile_app/features/wallet/data/wallet_repository.dart';
 import 'package:finsquare_mobile_app/features/wallet/presentation/providers/wallet_provider.dart';
 import 'package:finsquare_mobile_app/features/wallet/presentation/widgets/animated_balance_text.dart';
+import 'package:finsquare_mobile_app/features/wallet/presentation/widgets/withdrawal_modal.dart';
+import 'package:finsquare_mobile_app/features/community/presentation/providers/community_provider.dart';
+import 'package:finsquare_mobile_app/features/wallet/presentation/pages/activate_community_wallet_page.dart';
 
 // Colors matching old Greencard codebase
 const Color _greyBackground = Color(0xFFF3F3F3);
 const Color _greyTextColor = Color(0xFF606060);
 const Color _greyIconColor = Color(0xFF8E8E8E);
 const Color _mainTextColor = Color(0xFF333333);
-const Color _veryLightPrimaryColor = Color(0xFFE8F5E9);
+const Color _veryLightPrimaryColor = Color(0xFFE8E8E8);
+const Color _inactiveTabBackground = Color(0xFFF3F3F3);
+const Color _inactiveTabTextColor = Color(0xFF8E8E8E);
+
+/// Wallet tab enum
+enum WalletTab { personal, community }
 
 /// Provider for transaction history
 final transactionHistoryProvider = FutureProvider.autoDispose<List<WalletTransaction>>((ref) async {
@@ -49,6 +57,7 @@ class WalletPage extends ConsumerStatefulWidget {
 class _WalletPageState extends ConsumerState<WalletPage> {
   bool _isBalanceVisible = true;
   Timer? _pollingTimer;
+  WalletTab _selectedTab = WalletTab.personal;
 
   @override
   void initState() {
@@ -101,12 +110,27 @@ class _WalletPageState extends ConsumerState<WalletPage> {
   }
 
   void _onWithdraw() {
-    context.push(AppRoutes.withdraw);
+    showWithdrawalModal(context);
+  }
+
+  /// Check if community tab should be visible
+  /// Only show for Admin/Co-Admin and not for default FinSquare Community
+  bool _shouldShowCommunityTab(CommunityState communityState) {
+    final activeCommunity = communityState.activeCommunity;
+    if (activeCommunity == null) return false;
+
+    // Don't show for default FinSquare Community (everyone is just a member)
+    if (activeCommunity.isDefault) return false;
+
+    // Only show for Admin or Co-Admin
+    return activeCommunity.hasAdminPrivileges;
   }
 
   @override
   Widget build(BuildContext context) {
     final walletState = ref.watch(walletProvider);
+    final communityState = ref.watch(communityProvider);
+    final showCommunityTab = _shouldShowCommunityTab(communityState);
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -133,62 +157,53 @@ class _WalletPageState extends ConsumerState<WalletPage> {
                     ),
                   ),
                   const SizedBox(height: 10),
-                  // Personal wallet tab indicator - matching old design
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: _veryLightPrimaryColor,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppColors.primary, width: 1),
-                    ),
-                    child: Text(
-                      'Personal wallet',
-                      style: TextStyle(
-                        fontFamily: AppTextStyles.fontFamily,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: const Color(0xFF4A4A4A),
-                      ),
-                    ),
-                  ),
+                  // Wallet Tabs
+                  _buildWalletTabs(showCommunityTab),
                   const SizedBox(height: 18),
-                  // Wallet Balance Container - matching old design exactly
-                  walletState.isFirstLoad && walletState.isLoading
-                      ? _buildWalletBalanceShimmer()
-                      : _buildWalletBalanceContainer(walletState),
-                  const SizedBox(height: 20),
-                  // Transactions Header - matching old design
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Transactions',
-                        style: TextStyle(
-                          fontFamily: AppTextStyles.fontFamily,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14,
-                          color: _mainTextColor,
-                        ),
-                      ),
-                      InkWell(
-                        onTap: () {
-                          // TODO: Navigate to all transactions
-                        },
-                        child: Text(
-                          'View All',
+                  // Content based on selected tab
+                  if (_selectedTab == WalletTab.personal) ...[
+                    // Personal Wallet Content
+                    // Wallet Balance Container - matching old design exactly
+                    walletState.isFirstLoad && walletState.isLoading
+                        ? _buildWalletBalanceShimmer()
+                        : _buildWalletBalanceContainer(walletState),
+                    const SizedBox(height: 20),
+                    // Transactions Header - matching old design
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Transactions',
                           style: TextStyle(
                             fontFamily: AppTextStyles.fontFamily,
                             fontWeight: FontWeight.w700,
                             fontSize: 14,
-                            color: AppColors.primary,
+                            color: _mainTextColor,
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  // Transaction List
-                  _buildTransactionList(),
+                        InkWell(
+                          onTap: () {
+                            // TODO: Navigate to all transactions
+                          },
+                          child: Text(
+                            'View All',
+                            style: TextStyle(
+                              fontFamily: AppTextStyles.fontFamily,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    // Transaction List
+                    _buildTransactionList(),
+                  ] else ...[
+                    // Community Wallet Content
+                    _buildCommunityWalletContent(communityState),
+                  ],
                 ],
               ),
             ),
@@ -196,6 +211,74 @@ class _WalletPageState extends ConsumerState<WalletPage> {
         ),
       ),
     );
+  }
+
+  /// Build wallet tabs row
+  Widget _buildWalletTabs(bool showCommunityTab) {
+    return Row(
+      children: [
+        // Personal Wallet Tab
+        _buildTab(
+          label: 'Personal wallet',
+          isSelected: _selectedTab == WalletTab.personal,
+          onTap: () {
+            setState(() {
+              _selectedTab = WalletTab.personal;
+            });
+          },
+        ),
+        // Community Tab (only if Admin/Co-Admin and not default community)
+        if (showCommunityTab) ...[
+          const SizedBox(width: 20),
+          _buildTab(
+            label: 'Community wallet',
+            isSelected: _selectedTab == WalletTab.community,
+            onTap: () {
+              setState(() {
+                _selectedTab = WalletTab.community;
+              });
+            },
+          ),
+        ],
+      ],
+    );
+  }
+
+  /// Build individual tab widget
+  Widget _buildTab({
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: isSelected ? _veryLightPrimaryColor : _inactiveTabBackground,
+          borderRadius: BorderRadius.circular(8),
+          border: isSelected
+              ? Border.all(color: AppColors.primary, width: 1)
+              : null,
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontFamily: AppTextStyles.fontFamily,
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            color: isSelected ? const Color(0xFF4A4A4A) : _inactiveTabTextColor,
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Build community wallet content
+  Widget _buildCommunityWalletContent(CommunityState communityState) {
+    // TODO: Check if community wallet exists via API and show appropriate content
+    // For now, show the activation page (wallet not created yet)
+    return const ActivateCommunityWalletPage();
   }
 
   /// Shimmer loading state for wallet balance - matching old design

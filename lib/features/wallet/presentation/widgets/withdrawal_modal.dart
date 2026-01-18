@@ -1,35 +1,50 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
 import 'package:finsquare_mobile_app/config/theme/app_theme.dart';
+import 'package:finsquare_mobile_app/config/routes/app_router.dart';
 import 'package:finsquare_mobile_app/features/wallet/data/wallet_repository.dart';
 import 'package:finsquare_mobile_app/features/wallet/presentation/providers/withdraw_provider.dart';
 import 'package:finsquare_mobile_app/features/wallet/presentation/providers/wallet_provider.dart';
+import 'package:finsquare_mobile_app/features/wallet/presentation/widgets/withdrawal_pin_modal.dart';
 
 // Colors matching old Greencard codebase
 const Color _greyBackground = Color(0xFFF3F3F3);
 const Color _greyTextColor = Color(0xFF606060);
 const Color _greyIconColor = Color(0xFF595959);
 const Color _mainTextColor = Color(0xFF333333);
-const Color _veryLightPrimaryColor = Color(0xFFE8F5E9);
+const Color _veryLightPrimaryColor = Color(0xFFE8E8E8);
 
-/// Withdraw Page - matching old Greencard withdrawal_modal.dart design
-///
-/// Has three views:
-/// 1. Initial view - Set up withdrawal account
-/// 2. Add account view - Enter account details and bank
-/// 3. Withdraw view - Enter amount and confirm
-class WithdrawPage extends ConsumerStatefulWidget {
-  const WithdrawPage({super.key});
-
-  @override
-  ConsumerState<WithdrawPage> createState() => _WithdrawPageState();
+/// Show the withdrawal modal bottom sheet
+void showWithdrawalModal(BuildContext context) {
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: Colors.transparent,
+    isScrollControlled: true,
+    builder: (context) => const WithdrawalModal(),
+  );
 }
 
-class _WithdrawPageState extends ConsumerState<WithdrawPage> {
+/// Withdrawal Modal - matching old Greencard withdrawal_modal.dart design 100%
+///
+/// Has three views:
+/// 1. Initial view - Set up withdrawal account (shown if no saved account)
+/// 2. Add account view - Enter account details and bank
+/// 3. Withdraw view - Enter amount and confirm (shown if account exists)
+class WithdrawalModal extends ConsumerStatefulWidget {
+  const WithdrawalModal({super.key});
+
+  @override
+  ConsumerState<WithdrawalModal> createState() => _WithdrawalModalState();
+}
+
+class _WithdrawalModalState extends ConsumerState<WithdrawalModal> {
   // View state
   bool _showAddAccountView = false;
   bool _showWithdrawView = false;
+  bool _isLoadingAccount = true;
 
   // Form controllers
   final _accountNumberController = TextEditingController();
@@ -45,10 +60,26 @@ class _WithdrawPageState extends ConsumerState<WithdrawPage> {
   String? _amountError;
   Timer? _debounceTimer;
 
+  // Saved withdrawal account
+  WithdrawalAccount? _savedAccount;
+
+  /// Calculate transfer fee: ₦10 flat + 0.75% of amount
+  double _calculateFee(double amount) {
+    const double flatFee = 10.0;
+    const double percentageFee = 0.0075; // 0.75%
+    return flatFee + (amount * percentageFee);
+  }
+
+  /// Get total amount to be debited (amount + fee)
+  double _getTotalDebit(double amount) {
+    return amount + _calculateFee(amount);
+  }
+
   @override
   void initState() {
     super.initState();
     _accountNumberController.addListener(_debounceVerification);
+    _loadSavedWithdrawalAccount();
   }
 
   @override
@@ -58,6 +89,91 @@ class _WithdrawPageState extends ConsumerState<WithdrawPage> {
     _bankSearchController.dispose();
     _debounceTimer?.cancel();
     super.dispose();
+  }
+
+  /// Load saved withdrawal account from backend
+  Future<void> _loadSavedWithdrawalAccount() async {
+    try {
+      final repository = ref.read(walletRepositoryProvider);
+      final savedAccount = await repository.getWithdrawalAccount();
+
+      if (savedAccount != null && mounted) {
+        setState(() {
+          _savedAccount = savedAccount;
+          _selectedBank = Bank(
+            code: savedAccount.bankCode,
+            name: savedAccount.bankName,
+          );
+          _accountNumberController.text = savedAccount.accountNumber;
+          _accountHolderName = savedAccount.accountName;
+          _isAccountVerified = true;
+          _showWithdrawView = true;
+          _isLoadingAccount = false;
+        });
+      } else {
+        if (mounted) {
+          setState(() {
+            _isLoadingAccount = false;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingAccount = false;
+        });
+      }
+    }
+  }
+
+  /// Save withdrawal account to backend
+  Future<void> _saveWithdrawalAccount() async {
+    if (_selectedBank == null ||
+        _accountHolderName == null ||
+        _accountNumberController.text.isEmpty) {
+      return;
+    }
+
+    try {
+      final repository = ref.read(walletRepositoryProvider);
+      final request = CreateWithdrawalAccountRequest(
+        bankCode: _selectedBank!.code,
+        bankName: _selectedBank!.name,
+        accountNumber: _accountNumberController.text,
+        accountName: _accountHolderName!,
+      );
+
+      final savedAccount = await repository.saveWithdrawalAccount(request);
+
+      if (mounted) {
+        setState(() {
+          _savedAccount = savedAccount;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Withdrawal account saved successfully',
+              style: TextStyle(fontFamily: AppTextStyles.fontFamily),
+            ),
+            backgroundColor: AppColors.primary,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Failed to save withdrawal account. Please try again.',
+              style: TextStyle(fontFamily: AppTextStyles.fontFamily),
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   void _debounceVerification() {
@@ -157,12 +273,14 @@ class _WithdrawPageState extends ConsumerState<WithdrawPage> {
       return;
     }
 
-    // Check wallet balance
+    // Check wallet balance including fees
     final walletState = ref.read(walletProvider);
     final walletBalance = double.tryParse(walletState.balance) ?? 0.0;
+    final totalDebit = _getTotalDebit(amount);
 
-    if (amount > walletBalance) {
-      setState(() => _amountError = 'Insufficient balance. Available: ₦${walletBalance.toStringAsFixed(2)}');
+    if (totalDebit > walletBalance) {
+      final maxWithdrawable = walletBalance - _calculateFee(walletBalance * 0.99);
+      setState(() => _amountError = 'Insufficient balance for amount + fees. Max: ₦${maxWithdrawable.toStringAsFixed(2)}');
       return;
     }
 
@@ -180,67 +298,37 @@ class _WithdrawPageState extends ConsumerState<WithdrawPage> {
 
     final walletState = ref.read(walletProvider);
     final walletBalance = double.tryParse(walletState.balance) ?? 0.0;
-    if (amount > walletBalance) return false;
+    final totalDebit = _getTotalDebit(amount);
+    if (totalDebit > walletBalance) return false;
 
     return true;
   }
 
-  Future<void> _initiateWithdrawal() async {
+  void _initiateWithdrawal() {
     final amount = double.tryParse(_amountController.text.replaceAll(RegExp(r'[^\d]'), ''));
     if (amount == null || _selectedBank == null || _accountHolderName == null) return;
 
-    // Show PIN entry dialog
-    final pin = await _showPinDialog();
-    if (pin == null || pin.isEmpty) return;
+    // Close current modal first
+    Navigator.pop(context);
 
-    final success = await ref.read(withdrawProvider.notifier).withdraw(
-      amount: amount,
-      destinationAccountNumber: _accountNumberController.text,
-      destinationBankCode: _selectedBank!.code,
-      destinationAccountName: _accountHolderName!,
-      narration: 'Withdrawal to ${_selectedBank!.name}',
-      transactionPin: pin,
-    );
-
-    if (success && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Withdrawal successful'),
-          backgroundColor: AppColors.primary,
-        ),
-      );
-      // Refresh wallet balance
-      ref.read(walletProvider.notifier).refreshBalance();
-      Navigator.pop(context);
-    }
-  }
-
-  Future<String?> _showPinDialog() async {
-    String pin = '';
-    return showDialog<String>(
+    // Show PIN entry modal (matching old design)
+    showModalBottomSheet(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Enter Transaction PIN'),
-        content: TextField(
-          autofocus: true,
-          decoration: const InputDecoration(hintText: 'PIN'),
-          keyboardType: TextInputType.number,
-          obscureText: true,
-          maxLength: 4,
-          onChanged: (value) => pin = value,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, pin),
-            child: const Text('Confirm'),
-          ),
-        ],
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => WithdrawalPinModal(
+        accountNumber: _accountNumberController.text.trim(),
+        accountName: _accountHolderName!,
+        bankName: _selectedBank!.name,
+        bankCode: _selectedBank!.code,
+        amount: amount,
       ),
-    );
+    ).then((success) {
+      if (success == true && mounted) {
+        // Navigate to success page
+        context.push(AppRoutes.withdrawalSuccess);
+      }
+    });
   }
 
   void _showBankSelectionModal() {
@@ -267,52 +355,59 @@ class _WithdrawPageState extends ConsumerState<WithdrawPage> {
       }
     });
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Home Bar
-            Center(
-              child: Container(
-                padding: const EdgeInsets.only(top: 12, bottom: 20),
-                child: Container(
-                  width: 51,
-                  height: 5,
-                  decoration: BoxDecoration(
-                    color: Colors.black,
-                    borderRadius: BorderRadius.circular(3),
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.7,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      child: _isLoadingAccount
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Loading...',
+                    style: TextStyle(
+                      fontFamily: AppTextStyles.fontFamily,
+                      fontSize: 14,
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Home Bar
+                Center(
+                  child: Container(
+                    padding: const EdgeInsets.only(top: 12, bottom: 20),
+                    child: Container(
+                      width: 51,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: Colors.black,
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
-            // Horizontal Divider
-            Container(height: 1, color: const Color(0xFFF4F4F4)),
-            const SizedBox(height: 16),
-            // Header Section
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+                // Horizontal Divider
+                Container(height: 1, color: const Color(0xFFF4F4F4)),
+                const SizedBox(height: 16),
+                // Header Section
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      InkWell(
-                        onTap: () {
-                          if (_showWithdrawView) {
-                            setState(() {
-                              _showWithdrawView = false;
-                              _showAddAccountView = true;
-                            });
-                          } else if (_showAddAccountView) {
-                            setState(() => _showAddAccountView = false);
-                          } else {
-                            Navigator.pop(context);
-                          }
-                        },
-                        child: const Icon(Icons.arrow_back, color: Colors.black),
-                      ),
-                      const SizedBox(width: 16),
                       Text(
                         'Withdraw from Wallet',
                         style: TextStyle(
@@ -322,35 +417,29 @@ class _WithdrawPageState extends ConsumerState<WithdrawPage> {
                           color: Colors.black.withValues(alpha: 0.7),
                         ),
                       ),
+                      const SizedBox(height: 10),
+                      Text(
+                        'Withdraw your funds instantly to your specified account',
+                        style: TextStyle(
+                          fontFamily: AppTextStyles.fontFamily,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.black.withValues(alpha: 0.7),
+                        ),
+                      ),
                     ],
                   ),
-                  const SizedBox(height: 10),
-                  Padding(
-                    padding: const EdgeInsets.only(left: 40),
-                    child: Text(
-                      'Withdraw your funds instantly to your specified account',
-                      style: TextStyle(
-                        fontFamily: AppTextStyles.fontFamily,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.black.withValues(alpha: 0.7),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+                ),
+                // Dynamic Content
+                Expanded(
+                  child: _showWithdrawView
+                      ? _buildWithdrawView(withdrawState)
+                      : _showAddAccountView
+                          ? _buildAddAccountView()
+                          : _buildInitialView(),
+                ),
+              ],
             ),
-            // Dynamic Content
-            Expanded(
-              child: _showWithdrawView
-                  ? _buildWithdrawView(withdrawState)
-                  : _showAddAccountView
-                      ? _buildAddAccountView()
-                      : _buildInitialView(),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -375,11 +464,15 @@ class _WithdrawPageState extends ConsumerState<WithdrawPage> {
                 ),
               ],
             ),
-            child: const Center(
-              child: Icon(
-                Icons.arrow_upward,
-                color: Colors.white,
-                size: 48,
+            child: Center(
+              child: SvgPicture.asset(
+                'assets/svgs/u_money-withdraw.svg',
+                width: 51,
+                height: 51,
+                colorFilter: const ColorFilter.mode(
+                  Colors.white,
+                  BlendMode.srcIn,
+                ),
               ),
             ),
           ),
@@ -590,10 +683,16 @@ class _WithdrawPageState extends ConsumerState<WithdrawPage> {
             height: 56,
             child: ElevatedButton(
               onPressed: _isAccountVerified
-                  ? () => setState(() {
-                        _showAddAccountView = false;
-                        _showWithdrawView = true;
-                      })
+                  ? () async {
+                      // Save withdrawal account to backend
+                      await _saveWithdrawalAccount();
+                      if (mounted) {
+                        setState(() {
+                          _showAddAccountView = false;
+                          _showWithdrawView = true;
+                        });
+                      }
+                    }
                   : null,
               style: ElevatedButton.styleFrom(
                 backgroundColor: _isAccountVerified ? AppColors.primary : Colors.grey,
@@ -675,7 +774,102 @@ class _WithdrawPageState extends ConsumerState<WithdrawPage> {
               ),
             ],
           ),
-          const SizedBox(height: 40),
+          // Fee Breakdown (only show when amount is entered)
+          Builder(
+            builder: (context) {
+              final amount = double.tryParse(
+                _amountController.text.replaceAll(RegExp(r'[^\d]'), ''),
+              );
+              if (amount == null || amount < 100) {
+                return const SizedBox(height: 24);
+              }
+              final fee = _calculateFee(amount);
+              final totalDebit = _getTotalDebit(amount);
+              return Padding(
+                padding: const EdgeInsets.only(top: 16),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF8E1), // Light amber background
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFFFE082)),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Amount to receive:',
+                            style: TextStyle(
+                              fontFamily: AppTextStyles.fontFamily,
+                              fontSize: 12,
+                              color: Colors.grey[700],
+                            ),
+                          ),
+                          Text(
+                            '₦${amount.toStringAsFixed(2)}',
+                            style: TextStyle(
+                              fontFamily: AppTextStyles.fontFamily,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Transfer fee:',
+                            style: TextStyle(
+                              fontFamily: AppTextStyles.fontFamily,
+                              fontSize: 12,
+                              color: Colors.grey[700],
+                            ),
+                          ),
+                          Text(
+                            '₦${fee.toStringAsFixed(2)}',
+                            style: TextStyle(
+                              fontFamily: AppTextStyles.fontFamily,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.orange[800],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Divider(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Total debit:',
+                            style: TextStyle(
+                              fontFamily: AppTextStyles.fontFamily,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          Text(
+                            '₦${totalDebit.toStringAsFixed(2)}',
+                            style: TextStyle(
+                              fontFamily: AppTextStyles.fontFamily,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.red[700],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 16),
           // Destination Account Label
           Text(
             'Destination Account',
@@ -750,6 +944,11 @@ class _WithdrawPageState extends ConsumerState<WithdrawPage> {
                 onTap: () => setState(() {
                   _showWithdrawView = false;
                   _showAddAccountView = true;
+                  // Reset for new account entry
+                  _accountNumberController.clear();
+                  _selectedBank = null;
+                  _accountHolderName = null;
+                  _isAccountVerified = false;
                 }),
                 child: Text(
                   'Change',
@@ -807,8 +1006,6 @@ class _WithdrawPageState extends ConsumerState<WithdrawPage> {
 
   /// Bank selection bottom sheet
   Widget _buildBankSelectionSheet() {
-    final bankListAsync = ref.watch(bankListProvider);
-
     return StatefulBuilder(
       builder: (context, setModalState) {
         return Container(
@@ -868,67 +1065,72 @@ class _WithdrawPageState extends ConsumerState<WithdrawPage> {
                 ),
               ),
               const SizedBox(height: 8),
-              // Bank List
+              // Bank List - Use Consumer to properly watch provider changes
               Expanded(
-                child: bankListAsync.when(
-                  loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (err, stack) => Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.error_outline, size: 64, color: Colors.orange),
-                        const SizedBox(height: 16),
-                        Text('Unable to load banks'),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: () => ref.invalidate(bankListProvider),
-                          child: const Text('Retry'),
-                        ),
-                      ],
-                    ),
-                  ),
-                  data: (banks) {
-                    final searchQuery = _bankSearchController.text.toLowerCase();
-                    final filteredBanks = searchQuery.isEmpty
-                        ? banks
-                        : banks.where((bank) => bank.name.toLowerCase().contains(searchQuery)).toList();
-
-                    if (filteredBanks.isEmpty && searchQuery.isNotEmpty) {
-                      return Center(
+                child: Consumer(
+                  builder: (context, ref, child) {
+                    final bankListAsync = ref.watch(bankListProvider);
+                    return bankListAsync.when(
+                      loading: () => const Center(child: CircularProgressIndicator()),
+                      error: (err, stack) => Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.search_off, size: 64, color: Colors.grey[400]),
+                            const Icon(Icons.error_outline, size: 64, color: Colors.orange),
                             const SizedBox(height: 16),
-                            Text('No banks found'),
+                            const Text('Unable to load banks'),
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                              onPressed: () => ref.invalidate(bankListProvider),
+                              child: const Text('Retry'),
+                            ),
                           ],
                         ),
-                      );
-                    }
+                      ),
+                      data: (banks) {
+                        final searchQuery = _bankSearchController.text.toLowerCase();
+                        final filteredBanks = searchQuery.isEmpty
+                            ? banks
+                            : banks.where((bank) => bank.name.toLowerCase().contains(searchQuery)).toList();
 
-                    return ListView.builder(
-                      itemCount: filteredBanks.length,
-                      itemBuilder: (context, index) {
-                        final bank = filteredBanks[index];
-                        return ListTile(
-                          title: Text(
-                            bank.name,
-                            style: TextStyle(
-                              fontFamily: AppTextStyles.fontFamily,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
+                        if (filteredBanks.isEmpty && searchQuery.isNotEmpty) {
+                          return Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.search_off, size: 64, color: Colors.grey[400]),
+                                const SizedBox(height: 16),
+                                const Text('No banks found'),
+                              ],
                             ),
-                          ),
-                          onTap: () {
-                            setState(() {
-                              _selectedBank = bank;
-                              _isAccountVerified = false;
-                              _accountHolderName = null;
-                            });
-                            Navigator.pop(context);
-                            if (_accountNumberController.text.length == 10) {
-                              _debounceVerification();
-                            }
+                          );
+                        }
+
+                        return ListView.builder(
+                          itemCount: filteredBanks.length,
+                          itemBuilder: (context, index) {
+                            final bank = filteredBanks[index];
+                            return ListTile(
+                              title: Text(
+                                bank.name,
+                                style: TextStyle(
+                                  fontFamily: AppTextStyles.fontFamily,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              onTap: () {
+                                setState(() {
+                                  _selectedBank = bank;
+                                  _isAccountVerified = false;
+                                  _accountHolderName = null;
+                                });
+                                Navigator.pop(context);
+                                if (_accountNumberController.text.length == 10) {
+                                  _debounceVerification();
+                                }
+                              },
+                            );
                           },
                         );
                       },

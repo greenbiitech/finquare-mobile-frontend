@@ -11,7 +11,7 @@ const Color _greyBackground = Color(0xFFF3F3F3);
 const Color _greyTextColor = Color(0xFF606060);
 const Color _greyIconColor = Color(0xFF595959);
 const Color _mainTextColor = Color(0xFF333333);
-const Color _veryLightPrimaryColor = Color(0xFFE8F5E9);
+const Color _veryLightPrimaryColor = Color(0xFFE8E8E8);
 
 /// Top Up Page - Selection Screen
 ///

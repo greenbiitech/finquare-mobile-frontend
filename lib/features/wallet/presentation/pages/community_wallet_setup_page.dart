@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:finsquare_mobile_app/config/theme/app_theme.dart';
-import 'package:finsquare_mobile_app/features/community/data/community_repository.dart';
-import 'package:finsquare_mobile_app/features/community/presentation/providers/community_provider.dart';
 
 /// Community Wallet Setup Steps
 enum CommunityWalletSetupStep {
@@ -15,8 +13,56 @@ enum CommunityWalletSetupStep {
   success,
 }
 
+/// Mock Co-Admin model for UI development
+class MockCoAdmin {
+  final String userId;
+  final String fullName;
+  final String? photo;
+
+  MockCoAdmin({required this.userId, required this.fullName, this.photo});
+}
+
+/// Approval Rule enum for UI
+enum ApprovalRule {
+  thirtyPercent,
+  fiftyPercent,
+  seventyFivePercent,
+  hundredPercent;
+
+  String get displayName {
+    switch (this) {
+      case ApprovalRule.thirtyPercent:
+        return '30%';
+      case ApprovalRule.fiftyPercent:
+        return '50%';
+      case ApprovalRule.seventyFivePercent:
+        return '75%';
+      case ApprovalRule.hundredPercent:
+        return '100%';
+    }
+  }
+
+  String get description {
+    switch (this) {
+      case ApprovalRule.thirtyPercent:
+        return 'At least 30% of signatories must approve';
+      case ApprovalRule.fiftyPercent:
+        return 'At least 50% of signatories must approve';
+      case ApprovalRule.seventyFivePercent:
+        return 'At least 75% of signatories must approve';
+      case ApprovalRule.hundredPercent:
+        return 'All signatories must approve';
+    }
+  }
+}
+
 /// Community Wallet Setup Page
 /// Multi-step flow for creating a community wallet
+///
+/// TODO: Connect to backend when UI is finalized
+/// - Replace mock data with actual API calls
+/// - Use repository.getCoAdmins(communityId) for co-admins list
+/// - Use repository.createCommunityWallet() for wallet creation
 class CommunityWalletSetupPage extends ConsumerStatefulWidget {
   final String communityId;
 
@@ -30,59 +76,21 @@ class CommunityWalletSetupPage extends ConsumerStatefulWidget {
 class _CommunityWalletSetupPageState
     extends ConsumerState<CommunityWalletSetupPage> {
   CommunityWalletSetupStep _currentStep = CommunityWalletSetupStep.checklist;
-  bool _isLoading = false;
   String? _error;
 
   // Form data
-  CoAdmin? _selectedSignatory;
+  MockCoAdmin? _selectedSignatory;
   ApprovalRule _selectedApprovalRule = ApprovalRule.fiftyPercent;
   String _pin = '';
   String _confirmPin = '';
 
-  // Co-admins list
-  List<CoAdmin> _coAdmins = [];
-  bool _isLoadingCoAdmins = false;
-
-  // User name for signatory A (Admin)
-  String _adminName = '';
-
-  @override
-  void initState() {
-    super.initState();
-    _loadData();
-  }
-
-  Future<void> _loadData() async {
-    // Get admin name from user data
-    final user = ref.read(communityProvider).activeCommunity?.members
-        .where((m) => m.role == 'ADMIN')
-        .firstOrNull;
-    _adminName = user?.name ?? 'Admin';
-
-    setState(() => _isLoadingCoAdmins = true);
-
-    try {
-      final repository = ref.read(communityRepositoryProvider);
-      final response = await repository.getCoAdmins(widget.communityId);
-
-      if (response.success) {
-        setState(() {
-          _coAdmins = response.coAdmins;
-          _isLoadingCoAdmins = false;
-        });
-      } else {
-        setState(() {
-          _error = response.message;
-          _isLoadingCoAdmins = false;
-        });
-      }
-    } catch (e) {
-      setState(() {
-        _error = 'Failed to load co-admins';
-        _isLoadingCoAdmins = false;
-      });
-    }
-  }
+  // Mock data - replace with actual API data later
+  final String _adminName = 'John Doe';
+  final List<MockCoAdmin> _coAdmins = [
+    MockCoAdmin(userId: '1', fullName: 'Jane Smith'),
+    MockCoAdmin(userId: '2', fullName: 'Bob Wilson'),
+    MockCoAdmin(userId: '3', fullName: 'Alice Johnson'),
+  ];
 
   void _nextStep() {
     setState(() {
@@ -100,7 +108,15 @@ class _CommunityWalletSetupPageState
           _currentStep = CommunityWalletSetupStep.confirmPin;
           break;
         case CommunityWalletSetupStep.confirmPin:
-          _createWallet();
+          // TODO: Call createWallet API here
+          if (_pin == _confirmPin) {
+            _currentStep = CommunityWalletSetupStep.success;
+          } else {
+            _error = 'PINs do not match';
+            _currentStep = CommunityWalletSetupStep.createPin;
+            _pin = '';
+            _confirmPin = '';
+          }
           break;
         case CommunityWalletSetupStep.success:
           break;
@@ -132,60 +148,6 @@ class _CommunityWalletSetupPageState
           break;
       }
     });
-  }
-
-  Future<void> _createWallet() async {
-    if (_selectedSignatory == null) {
-      setState(() => _error = 'Please select a signatory');
-      return;
-    }
-
-    if (_pin != _confirmPin) {
-      setState(() {
-        _error = 'PINs do not match';
-        _currentStep = CommunityWalletSetupStep.createPin;
-        _pin = '';
-        _confirmPin = '';
-      });
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
-
-    try {
-      final repository = ref.read(communityRepositoryProvider);
-      final response = await repository.createCommunityWallet(
-        widget.communityId,
-        CreateCommunityWalletRequest(
-          signatoryBUserId: _selectedSignatory!.userId,
-          approvalRule: _selectedApprovalRule,
-          transactionPin: _pin,
-        ),
-      );
-
-      if (!mounted) return;
-
-      if (response.success) {
-        setState(() {
-          _isLoading = false;
-          _currentStep = CommunityWalletSetupStep.success;
-        });
-      } else {
-        setState(() {
-          _isLoading = false;
-          _error = response.message;
-        });
-      }
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-        _error = 'Failed to create wallet. Please try again.';
-      });
-    }
   }
 
   @override
@@ -253,6 +215,7 @@ class _CommunityWalletSetupPageState
   }
 
   /// Step 1: Wallet Checklist
+  /// TODO: Match to Figma design
   Widget _buildChecklistStep() {
     return Padding(
       padding: const EdgeInsets.all(24),
@@ -378,6 +341,7 @@ class _CommunityWalletSetupPageState
   }
 
   /// Step 2: Set up Signatories
+  /// TODO: Match to Figma design
   Widget _buildSignatoriesStep() {
     return Padding(
       padding: const EdgeInsets.all(24),
@@ -475,9 +439,7 @@ class _CommunityWalletSetupPageState
           ),
           const SizedBox(height: 8),
 
-          if (_isLoadingCoAdmins)
-            const Center(child: CircularProgressIndicator())
-          else if (_coAdmins.isEmpty)
+          if (_coAdmins.isEmpty)
             _buildNoCoAdminsMessage()
           else
             _buildCoAdminSelector(),
@@ -565,7 +527,6 @@ class _CommunityWalletSetupPageState
           const SizedBox(height: 16),
           TextButton(
             onPressed: () {
-              // Navigate to manage co-admins
               context.pop();
             },
             child: Text(
@@ -674,6 +635,7 @@ class _CommunityWalletSetupPageState
   }
 
   /// Step 3: Set up Approval Rules
+  /// TODO: Match to Figma design
   Widget _buildApprovalRulesStep() {
     return Padding(
       padding: const EdgeInsets.all(24),
@@ -819,6 +781,7 @@ class _CommunityWalletSetupPageState
   }
 
   /// Step 4 & 5: Create/Confirm PIN
+  /// TODO: Match to Figma design - use existing PIN keypad component if available
   Widget _buildPinStep({required bool isConfirm}) {
     final currentPin = isConfirm ? _confirmPin : _pin;
 
@@ -894,34 +857,6 @@ class _CommunityWalletSetupPageState
 
           // Keypad
           _buildKeypad(isConfirm: isConfirm),
-
-          if (_isLoading) ...[
-            const SizedBox(height: 24),
-            Center(
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    'Creating wallet...',
-                    style: TextStyle(
-                      fontFamily: AppTextStyles.fontFamily,
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
         ],
       ),
     );
@@ -939,30 +874,30 @@ class _CommunityWalletSetupPageState
             for (int i = 1; i <= 9; i++)
               _buildKeypadButton(
                 text: i.toString(),
-                onTap: _isLoading ? null : () => _addDigit(i.toString(), isConfirm),
+                onTap: () => _addDigit(i.toString(), isConfirm),
               ),
 
             // Delete button
             _buildKeypadButton(
               icon: Icons.backspace_outlined,
-              onTap: _isLoading ? null : () => _removeDigit(isConfirm),
+              onTap: () => _removeDigit(isConfirm),
             ),
 
             // 0
             _buildKeypadButton(
               text: '0',
-              onTap: _isLoading ? null : () => _addDigit('0', isConfirm),
+              onTap: () => _addDigit('0', isConfirm),
             ),
 
             // Confirm button
             _buildKeypadButton(
               icon: Icons.check,
               backgroundColor:
-                  (isConfirm ? _confirmPin : _pin).length == 4 && !_isLoading
+                  (isConfirm ? _confirmPin : _pin).length == 4
                       ? AppColors.primary
                       : Colors.grey,
               iconColor: Colors.white,
-              onTap: (isConfirm ? _confirmPin : _pin).length == 4 && !_isLoading
+              onTap: (isConfirm ? _confirmPin : _pin).length == 4
                   ? _nextStep
                   : null,
             ),
@@ -1043,6 +978,7 @@ class _CommunityWalletSetupPageState
   }
 
   /// Step 6: Success
+  /// TODO: Match to Figma design
   Widget _buildSuccessStep() {
     return Padding(
       padding: const EdgeInsets.all(24),
@@ -1096,7 +1032,6 @@ class _CommunityWalletSetupPageState
                 ),
               ),
               onPressed: () {
-                // Pop back to wallet page
                 context.pop();
               },
               child: Text(

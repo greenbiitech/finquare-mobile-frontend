@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
+import 'package:finsquare_mobile_app/config/routes/app_router.dart';
 import 'package:finsquare_mobile_app/config/theme/app_theme.dart';
 import 'package:finsquare_mobile_app/features/community/presentation/providers/community_provider.dart';
 
@@ -61,34 +63,18 @@ class _ActivateCommunityWalletWidget extends ConsumerStatefulWidget {
 }
 
 class _ActivateCommunityWalletWidgetState extends ConsumerState<_ActivateCommunityWalletWidget> {
-  bool _isLoading = false;
+  void _onSetUpCommunityWallet() {
+    final communityState = ref.read(communityProvider);
+    final communityId = communityState.activeCommunity?.id;
 
-  Future<void> _onSetUpCommunityWallet() async {
-    setState(() => _isLoading = true);
-
-    try {
-      // TODO: Navigate to community wallet setup flow
-      // This will include selecting 2 Co-Admin signatories
-      // context.push(AppRoutes.setupCommunityWallet);
-
-      if (!mounted) return;
-
-      // For now, show a placeholder message
+    if (communityId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Community wallet setup coming soon'),
-        ),
+        const SnackBar(content: Text('No active community found')),
       );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: ${e.toString()}')),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      return;
     }
+
+    context.push('${AppRoutes.communityWalletSetup}/$communityId');
   }
 
   @override
@@ -139,31 +125,16 @@ class _ActivateCommunityWalletWidgetState extends ConsumerState<_ActivateCommuni
                   borderRadius: BorderRadius.circular(43),
                 ),
               ),
-              onPressed: _isLoading ? null : _onSetUpCommunityWallet,
-              child: _isLoading
-                  ? const SizedBox(
-                      height: 24,
-                      width: 24,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                  : Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Set Up Community Wallet',
-                          style: TextStyle(
-                            fontFamily: AppTextStyles.fontFamily,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(width: 9),
-                      ],
-                    ),
+              onPressed: _onSetUpCommunityWallet,
+              child: Text(
+                'Set Up Community Wallet',
+                style: TextStyle(
+                  fontFamily: AppTextStyles.fontFamily,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
             ),
           ),
         ] else ...[

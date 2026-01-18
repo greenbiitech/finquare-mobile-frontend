@@ -1305,4 +1305,420 @@ class CommunityRepository {
     );
     return RemoveCoAdminResponse.fromJson(response.data);
   }
+
+  // =====================================================
+  // COMMUNITY WALLET
+  // =====================================================
+
+  /// Get co-admins for signatory selection
+  Future<CoAdminsResponse> getCoAdmins(String communityId) async {
+    final response = await _apiClient.get(
+      ApiEndpoints.getCoAdmins(communityId),
+    );
+    return CoAdminsResponse.fromJson(response.data);
+  }
+
+  /// Check wallet creation eligibility
+  Future<WalletEligibilityResponse> getWalletEligibility(
+    String communityId,
+  ) async {
+    final response = await _apiClient.get(
+      ApiEndpoints.getWalletEligibility(communityId),
+    );
+    return WalletEligibilityResponse.fromJson(response.data);
+  }
+
+  /// Get community wallet
+  Future<CommunityWalletResponse> getCommunityWallet(
+    String communityId,
+  ) async {
+    final response = await _apiClient.get(
+      ApiEndpoints.getCommunityWallet(communityId),
+    );
+    return CommunityWalletResponse.fromJson(response.data);
+  }
+
+  /// Create community wallet
+  Future<CreateCommunityWalletResponse> createCommunityWallet(
+    String communityId,
+    CreateCommunityWalletRequest request,
+  ) async {
+    final response = await _apiClient.post(
+      ApiEndpoints.createCommunityWallet(communityId),
+      data: request.toJson(),
+    );
+    return CreateCommunityWalletResponse.fromJson(response.data);
+  }
+}
+
+// =====================================================
+// COMMUNITY WALLET MODELS
+// =====================================================
+
+/// Approval Rule Enum
+enum ApprovalRule {
+  thirtyPercent,
+  fiftyPercent,
+  seventyFivePercent,
+  hundredPercent;
+
+  static ApprovalRule fromString(String value) {
+    switch (value.toUpperCase()) {
+      case 'THIRTY_PERCENT':
+        return ApprovalRule.thirtyPercent;
+      case 'FIFTY_PERCENT':
+        return ApprovalRule.fiftyPercent;
+      case 'SEVENTY_FIVE_PERCENT':
+        return ApprovalRule.seventyFivePercent;
+      case 'HUNDRED_PERCENT':
+        return ApprovalRule.hundredPercent;
+      default:
+        return ApprovalRule.fiftyPercent;
+    }
+  }
+
+  String toApiString() {
+    switch (this) {
+      case ApprovalRule.thirtyPercent:
+        return 'THIRTY_PERCENT';
+      case ApprovalRule.fiftyPercent:
+        return 'FIFTY_PERCENT';
+      case ApprovalRule.seventyFivePercent:
+        return 'SEVENTY_FIVE_PERCENT';
+      case ApprovalRule.hundredPercent:
+        return 'HUNDRED_PERCENT';
+    }
+  }
+
+  String get displayName {
+    switch (this) {
+      case ApprovalRule.thirtyPercent:
+        return '30%';
+      case ApprovalRule.fiftyPercent:
+        return '50%';
+      case ApprovalRule.seventyFivePercent:
+        return '75%';
+      case ApprovalRule.hundredPercent:
+        return '100%';
+    }
+  }
+
+  String get description {
+    switch (this) {
+      case ApprovalRule.thirtyPercent:
+        return 'At least 30% of signatories must approve';
+      case ApprovalRule.fiftyPercent:
+        return 'At least 50% of signatories must approve';
+      case ApprovalRule.seventyFivePercent:
+        return 'At least 75% of signatories must approve';
+      case ApprovalRule.hundredPercent:
+        return 'All signatories must approve';
+    }
+  }
+}
+
+/// Co-Admin Model for signatory selection
+class CoAdmin {
+  final String userId;
+  final String firstName;
+  final String lastName;
+  final String fullName;
+  final String email;
+  final String? photo;
+  final DateTime? joinedAt;
+
+  CoAdmin({
+    required this.userId,
+    required this.firstName,
+    required this.lastName,
+    required this.fullName,
+    required this.email,
+    this.photo,
+    this.joinedAt,
+  });
+
+  factory CoAdmin.fromJson(Map<String, dynamic> json) {
+    return CoAdmin(
+      userId: json['userId'] ?? '',
+      firstName: json['firstName'] ?? '',
+      lastName: json['lastName'] ?? '',
+      fullName: json['fullName'] ?? '',
+      email: json['email'] ?? '',
+      photo: json['photo'],
+      joinedAt: json['joinedAt'] != null
+          ? DateTime.parse(json['joinedAt'])
+          : null,
+    );
+  }
+}
+
+/// Co-Admins Response Model
+class CoAdminsResponse {
+  final bool success;
+  final String message;
+  final String communityId;
+  final String communityName;
+  final List<CoAdmin> coAdmins;
+  final int count;
+
+  CoAdminsResponse({
+    required this.success,
+    required this.message,
+    required this.communityId,
+    required this.communityName,
+    required this.coAdmins,
+    required this.count,
+  });
+
+  factory CoAdminsResponse.fromJson(Map<String, dynamic> json) {
+    final data = json['data'] as Map<String, dynamic>?;
+    final coAdminsList = data?['coAdmins'] as List<dynamic>? ?? [];
+
+    return CoAdminsResponse(
+      success: json['success'] ?? false,
+      message: json['message'] ?? '',
+      communityId: data?['communityId'] ?? '',
+      communityName: data?['communityName'] ?? '',
+      coAdmins: coAdminsList
+          .map((c) => CoAdmin.fromJson(c as Map<String, dynamic>))
+          .toList(),
+      count: data?['count'] ?? 0,
+    );
+  }
+}
+
+/// Wallet Eligibility Reason
+enum WalletIneligibilityReason {
+  walletExists,
+  personalWalletNotActivated,
+  insufficientCoAdmins,
+  none;
+
+  static WalletIneligibilityReason fromString(String? value) {
+    switch (value) {
+      case 'WALLET_EXISTS':
+        return WalletIneligibilityReason.walletExists;
+      case 'PERSONAL_WALLET_NOT_ACTIVATED':
+        return WalletIneligibilityReason.personalWalletNotActivated;
+      case 'INSUFFICIENT_CO_ADMINS':
+        return WalletIneligibilityReason.insufficientCoAdmins;
+      default:
+        return WalletIneligibilityReason.none;
+    }
+  }
+
+  String get userMessage {
+    switch (this) {
+      case WalletIneligibilityReason.walletExists:
+        return 'Community wallet already exists';
+      case WalletIneligibilityReason.personalWalletNotActivated:
+        return 'You must activate your personal wallet first';
+      case WalletIneligibilityReason.insufficientCoAdmins:
+        return 'You need at least 2 Co-Admins to create a community wallet';
+      case WalletIneligibilityReason.none:
+        return '';
+    }
+  }
+}
+
+/// Wallet Eligibility Response Model
+class WalletEligibilityResponse {
+  final bool success;
+  final String message;
+  final String communityId;
+  final String communityName;
+  final bool eligible;
+  final WalletIneligibilityReason reason;
+  final bool hasWallet;
+  final bool hasPersonalWallet;
+  final int coAdminCount;
+  final int requiredCoAdmins;
+
+  WalletEligibilityResponse({
+    required this.success,
+    required this.message,
+    required this.communityId,
+    required this.communityName,
+    required this.eligible,
+    required this.reason,
+    required this.hasWallet,
+    required this.hasPersonalWallet,
+    required this.coAdminCount,
+    required this.requiredCoAdmins,
+  });
+
+  factory WalletEligibilityResponse.fromJson(Map<String, dynamic> json) {
+    final data = json['data'] as Map<String, dynamic>?;
+
+    return WalletEligibilityResponse(
+      success: json['success'] ?? false,
+      message: json['message'] ?? '',
+      communityId: data?['communityId'] ?? '',
+      communityName: data?['communityName'] ?? '',
+      eligible: data?['eligible'] ?? false,
+      reason: WalletIneligibilityReason.fromString(data?['reason']),
+      hasWallet: data?['hasWallet'] ?? false,
+      hasPersonalWallet: data?['hasPersonalWallet'] ?? false,
+      coAdminCount: data?['coAdminCount'] ?? 0,
+      requiredCoAdmins: data?['requiredCoAdmins'] ?? 2,
+    );
+  }
+}
+
+/// Signatory Model
+class Signatory {
+  final String userId;
+  final String fullName;
+  final String role;
+
+  Signatory({
+    required this.userId,
+    required this.fullName,
+    required this.role,
+  });
+
+  factory Signatory.fromJson(Map<String, dynamic> json) {
+    return Signatory(
+      userId: json['userId'] ?? '',
+      fullName: json['fullName'] ?? '',
+      role: json['role'] ?? '',
+    );
+  }
+}
+
+/// Community Wallet Model
+class CommunityWallet {
+  final String id;
+  final String balance;
+  final List<Signatory> signatories;
+  final ApprovalRule approvalRule;
+  final String? externalWalletId;
+  final bool isActive;
+  final DateTime createdAt;
+  final DateTime? updatedAt;
+
+  CommunityWallet({
+    required this.id,
+    required this.balance,
+    required this.signatories,
+    required this.approvalRule,
+    this.externalWalletId,
+    required this.isActive,
+    required this.createdAt,
+    this.updatedAt,
+  });
+
+  factory CommunityWallet.fromJson(Map<String, dynamic> json) {
+    final signatoriesList = json['signatories'] as List<dynamic>? ?? [];
+
+    return CommunityWallet(
+      id: json['id'] ?? '',
+      balance: json['balance']?.toString() ?? '0',
+      signatories: signatoriesList
+          .map((s) => Signatory.fromJson(s as Map<String, dynamic>))
+          .toList(),
+      approvalRule: ApprovalRule.fromString(json['approvalRule'] ?? 'FIFTY_PERCENT'),
+      externalWalletId: json['externalWalletId'],
+      isActive: json['isActive'] ?? true,
+      createdAt: DateTime.parse(json['createdAt'] ?? DateTime.now().toIso8601String()),
+      updatedAt: json['updatedAt'] != null
+          ? DateTime.parse(json['updatedAt'])
+          : null,
+    );
+  }
+}
+
+/// Community Wallet Response Model
+class CommunityWalletResponse {
+  final bool success;
+  final String message;
+  final String communityId;
+  final String communityName;
+  final bool hasWallet;
+  final bool isDefault;
+  final CommunityWallet? wallet;
+  final bool canCreate;
+  final bool canWithdraw;
+
+  CommunityWalletResponse({
+    required this.success,
+    required this.message,
+    required this.communityId,
+    required this.communityName,
+    required this.hasWallet,
+    required this.isDefault,
+    this.wallet,
+    this.canCreate = false,
+    this.canWithdraw = false,
+  });
+
+  factory CommunityWalletResponse.fromJson(Map<String, dynamic> json) {
+    final data = json['data'] as Map<String, dynamic>?;
+
+    return CommunityWalletResponse(
+      success: json['success'] ?? false,
+      message: json['message'] ?? '',
+      communityId: data?['communityId'] ?? '',
+      communityName: data?['communityName'] ?? '',
+      hasWallet: data?['hasWallet'] ?? false,
+      isDefault: data?['isDefault'] ?? false,
+      wallet: data?['wallet'] != null
+          ? CommunityWallet.fromJson(data!['wallet'])
+          : null,
+      canCreate: data?['canCreate'] ?? false,
+      canWithdraw: data?['canWithdraw'] ?? false,
+    );
+  }
+}
+
+/// Create Community Wallet Request
+class CreateCommunityWalletRequest {
+  final String signatoryBUserId;
+  final ApprovalRule approvalRule;
+  final String transactionPin;
+
+  CreateCommunityWalletRequest({
+    required this.signatoryBUserId,
+    required this.approvalRule,
+    required this.transactionPin,
+  });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'signatoryBUserId': signatoryBUserId,
+      'approvalRule': approvalRule.toApiString(),
+      'transactionPin': transactionPin,
+    };
+  }
+}
+
+/// Create Community Wallet Response Model
+class CreateCommunityWalletResponse {
+  final bool success;
+  final String message;
+  final String communityId;
+  final String communityName;
+  final CommunityWallet? wallet;
+
+  CreateCommunityWalletResponse({
+    required this.success,
+    required this.message,
+    required this.communityId,
+    required this.communityName,
+    this.wallet,
+  });
+
+  factory CreateCommunityWalletResponse.fromJson(Map<String, dynamic> json) {
+    final data = json['data'] as Map<String, dynamic>?;
+
+    return CreateCommunityWalletResponse(
+      success: json['success'] ?? false,
+      message: json['message'] ?? '',
+      communityId: data?['communityId'] ?? '',
+      communityName: data?['communityName'] ?? '',
+      wallet: data?['wallet'] != null
+          ? CommunityWallet.fromJson(data!['wallet'])
+          : null,
+    );
+  }
 }

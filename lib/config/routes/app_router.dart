@@ -52,6 +52,7 @@ import 'package:finsquare_mobile_app/features/dues/presentation/pages/dues_succe
 import 'package:finsquare_mobile_app/features/dues/data/models/due_creation_data.dart';
 import 'package:finsquare_mobile_app/features/community/presentation/pages/manage_community_page.dart';
 import 'package:finsquare_mobile_app/features/community/presentation/pages/members_page.dart';
+import 'package:finsquare_mobile_app/features/wallet/presentation/pages/community_wallet_setup_page.dart';
 
 part 'app_router.g.dart';
 
@@ -114,6 +115,7 @@ abstract class AppRoutes {
   // Community management routes
   static const String manageCommunity = '/manage-community';
   static const String communityMembersList = '/community-members-list';
+  static const String communityWalletSetup = '/community-wallet-setup';
 
   // Dashboard alias
   static const String dashboard = '/home';
@@ -491,6 +493,14 @@ GoRouter appRouter(Ref ref) {
         builder: (context, state) {
           final communityId = state.pathParameters['communityId'] ?? '';
           return MembersPage(communityId: communityId);
+        },
+      ),
+      GoRoute(
+        path: '${AppRoutes.communityWalletSetup}/:communityId',
+        name: 'communityWalletSetup',
+        builder: (context, state) {
+          final communityId = state.pathParameters['communityId'] ?? '';
+          return CommunityWalletSetupPage(communityId: communityId);
         },
       ),
     ],

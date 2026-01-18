@@ -57,6 +57,22 @@ class ApiEndpoints {
   static String getCommunityMembers(String communityId) =>
       '/communities/$communityId/members';
 
+  /// Get co-admins for signatory selection: /communities/{communityId}/co-admins
+  static String getCoAdmins(String communityId) =>
+      '/communities/$communityId/co-admins';
+
+  /// Check wallet creation eligibility: /communities/{communityId}/wallet-eligibility
+  static String getWalletEligibility(String communityId) =>
+      '/communities/$communityId/wallet-eligibility';
+
+  /// Get community wallet: /communities/{communityId}/wallet
+  static String getCommunityWallet(String communityId) =>
+      '/communities/$communityId/wallet';
+
+  /// Create community wallet: /communities/{communityId}/wallet
+  static String createCommunityWallet(String communityId) =>
+      '/communities/$communityId/wallet';
+
   /// Add co-admins: /communities/add-co-admins
   static const String addCoAdmins = '/communities/add-co-admins';
 

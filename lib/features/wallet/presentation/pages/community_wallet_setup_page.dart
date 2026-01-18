@@ -233,7 +233,8 @@ class _CommunityWalletSetupPageState
 
   /// Step 1: Wallet Checklist
   Widget _buildChecklistStep() {
-    final bool hasCoAdmins = _selectedCoAdmins.isNotEmpty;
+    // Must have exactly 2 co-admins selected
+    final bool hasCoAdmins = _selectedCoAdmins.length == 2;
     final bool canContinue = hasCoAdmins && _hasSetSignatories;
 
     return Padding(
@@ -386,7 +387,7 @@ class _CommunityWalletSetupPageState
               borderRadius: BorderRadius.circular(16),
             ),
             child: Text(
-              isCompleted ? 'Done' : 'Not Done',
+              isCompleted ? 'Completed' : 'Not Done',
               style: TextStyle(
                 fontFamily: AppTextStyles.fontFamily,
                 fontSize: 12,
@@ -1154,8 +1155,24 @@ class _SelectCoAdminsModalState extends State<_SelectCoAdminsModal> {
   }
 
   void _toggleSelection(MockCoAdmin coAdmin) {
+    final isAlreadySelected = _selected.any((c) => c.userId == coAdmin.userId);
+
+    if (!isAlreadySelected && _selected.length >= 2) {
+      // Already have 2 selected, show message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'You can only select exactly 2 Co-admins',
+            style: TextStyle(fontFamily: AppTextStyles.fontFamily),
+          ),
+          backgroundColor: const Color(0xFFE65100),
+        ),
+      );
+      return;
+    }
+
     setState(() {
-      if (_selected.any((c) => c.userId == coAdmin.userId)) {
+      if (isAlreadySelected) {
         _selected.removeWhere((c) => c.userId == coAdmin.userId);
       } else {
         _selected.add(coAdmin);

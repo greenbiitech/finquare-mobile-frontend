@@ -1,0 +1,213 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
+import 'package:finsquare_mobile_app/config/routes/app_router.dart';
+import 'package:finsquare_mobile_app/config/theme/app_theme.dart';
+import 'package:finsquare_mobile_app/core/widgets/back_button.dart';
+import 'package:finsquare_mobile_app/core/widgets/custom_text_field.dart';
+import 'package:finsquare_mobile_app/core/services/snackbar_service.dart';
+import 'package:finsquare_mobile_app/features/wallet/data/wallet_repository.dart';
+
+// Colors from old codebase
+const Color _mainTextColor = Color(0xFF333333);
+
+/// Verify BVN Credentials Page
+///
+/// Third step in wallet setup flow.
+/// User enters their full email or phone number to verify ownership.
+/// When they click Continue, API is called to send OTP to that method.
+class VerifyBvnCredentialsPage extends ConsumerStatefulWidget {
+  const VerifyBvnCredentialsPage({
+    super.key,
+    required this.sessionId,
+    required this.method,
+  });
+
+  final String sessionId;
+  final String method; // 'phone' or 'email'
+
+  @override
+  ConsumerState<VerifyBvnCredentialsPage> createState() =>
+      _VerifyBvnCredentialsPageState();
+}
+
+class _VerifyBvnCredentialsPageState
+    extends ConsumerState<VerifyBvnCredentialsPage> {
+  final TextEditingController _credentialController = TextEditingController();
+  bool _isLoading = false;
+
+  bool get _isEmail => widget.method.toLowerCase() == 'email';
+
+  @override
+  void initState() {
+    super.initState();
+    _credentialController.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _credentialController.dispose();
+    super.dispose();
+  }
+
+  bool get _isValid {
+    final value = _credentialController.text.trim();
+    if (_isEmail) {
+      return RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value);
+    } else {
+      return RegExp(r'^\d{10,11}$').hasMatch(value);
+    }
+  }
+
+  void _showError(String message) {
+    showErrorSnackbar(message);
+  }
+
+  Future<void> _onContinue() async {
+    if (!_isValid) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final walletRepo = ref.read(walletRepositoryProvider);
+      final response = await walletRepo.verifyBvnMethod(
+        sessionId: widget.sessionId,
+        method: widget.method,
+      );
+
+      if (!mounted) return;
+
+      if (response.success) {
+        // Navigate to OTP verification with session data
+        context.push(
+          AppRoutes.verifyOtp,
+          extra: {
+            'sessionId': widget.sessionId,
+            'method': widget.method,
+          },
+        );
+      } else {
+        _showError(response.message);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      _showError('Failed to send verification code. Please try again.');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final canContinue = _isValid && !_isLoading;
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: SizedBox(
+          width: MediaQuery.of(context).size.width,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 60),
+                const AppBackButton(),
+                const SizedBox(height: 22),
+                SvgPicture.asset('assets/svgs/pagination_dots.svg'),
+                const SizedBox(height: 15),
+                Text(
+                  'Verify your ${_isEmail ? 'Email' : 'Phone Number'}',
+                  style: TextStyle(
+                    fontFamily: AppTextStyles.fontFamily,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: _mainTextColor,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  'Please enter your complete ${_isEmail ? 'email address' : 'phone number'} linked to your BVN to receive a verification code.',
+                  style: TextStyle(
+                    fontFamily: AppTextStyles.fontFamily,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: const Color(0xFF606060),
+                  ),
+                ),
+                const SizedBox(height: 30),
+                CustomTextField(
+                  controller: _credentialController,
+                  hintText: _isEmail ? 'Enter Email' : 'Enter Phone Number',
+                  labelText: _isEmail ? 'Email' : 'Phone Number',
+                  keyboardType: _isEmail
+                      ? TextInputType.emailAddress
+                      : TextInputType.phone,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return null;
+                    }
+                    if (_isEmail) {
+                      return RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                              .hasMatch(value)
+                          ? null
+                          : 'Please enter a valid email address';
+                    } else {
+                      return RegExp(r'^\d{10,11}$').hasMatch(value)
+                          ? null
+                          : 'Please enter a valid phone number';
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      bottomNavigationBar: Padding(
+        padding:
+            const EdgeInsets.symmetric(horizontal: 20).copyWith(bottom: 40),
+        child: SizedBox(
+          width: double.infinity,
+          height: 54,
+          child: ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor:
+                  canContinue ? AppColors.primary : AppColors.surfaceVariant,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(43),
+              ),
+            ),
+            onPressed: canContinue ? _onContinue : null,
+            child: _isLoading
+                ? SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      color: AppColors.primary,
+                      strokeWidth: 2,
+                    ),
+                  )
+                : Text(
+                    'Continue',
+                    style: TextStyle(
+                      fontFamily: AppTextStyles.fontFamily,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: canContinue ? Colors.white : AppColors.textDisabled,
+                    ),
+                  ),
+          ),
+        ),
+      ),
+    );
+  }
+}

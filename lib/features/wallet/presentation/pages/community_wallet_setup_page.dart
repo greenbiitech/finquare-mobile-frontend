@@ -18,9 +18,15 @@ enum CommunityWalletSetupStep {
 class MockCoAdmin {
   final String userId;
   final String fullName;
+  final String email;
   final String? photo;
 
-  MockCoAdmin({required this.userId, required this.fullName, this.photo});
+  MockCoAdmin({
+    required this.userId,
+    required this.fullName,
+    required this.email,
+    this.photo,
+  });
 }
 
 /// Approval Rule enum for UI
@@ -85,12 +91,18 @@ class _CommunityWalletSetupPageState
   String _pin = '';
   String _confirmPin = '';
 
+  // Checklist state
+  List<MockCoAdmin> _selectedCoAdmins = [];
+  bool _hasSetSignatories = false;
+
   // Mock data - replace with actual API data later
   final String _adminName = 'John Doe';
   final List<MockCoAdmin> _coAdmins = [
-    MockCoAdmin(userId: '1', fullName: 'Jane Smith'),
-    MockCoAdmin(userId: '2', fullName: 'Bob Wilson'),
-    MockCoAdmin(userId: '3', fullName: 'Alice Johnson'),
+    MockCoAdmin(userId: '1', fullName: 'Ngozi Nwankwo', email: 'Ngozi.Nwankwo@example.com'),
+    MockCoAdmin(userId: '2', fullName: 'Chinonso Eze', email: 'Chinonso.Eze@example.com'),
+    MockCoAdmin(userId: '3', fullName: 'Ifeyinwa Uche', email: 'Tunde@gmail.com'),
+    MockCoAdmin(userId: '4', fullName: 'Adaeze Okafor', email: 'Adaeze.Okafor@example.com'),
+    MockCoAdmin(userId: '5', fullName: 'Emeka Obiora', email: 'Emeka.Obiora@example.com'),
   ];
 
   void _nextStep() {
@@ -221,10 +233,8 @@ class _CommunityWalletSetupPageState
 
   /// Step 1: Wallet Checklist
   Widget _buildChecklistStep() {
-    // TODO: These should come from backend - check if co-admins exist and signatories are set
-    final bool hasCoAdmins = false; // Mock: set to true when co-admins are added
-    final bool hasSignatories = false; // Mock: set to true when signatories are set
-    final bool canContinue = hasCoAdmins && hasSignatories;
+    final bool hasCoAdmins = _selectedCoAdmins.isNotEmpty;
+    final bool canContinue = hasCoAdmins && _hasSetSignatories;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -254,16 +264,37 @@ class _CommunityWalletSetupPageState
             ),
           ),
           const SizedBox(height: 24),
-          _buildChecklistItem(
-            title: 'Add Co-admins',
-            subtitle: 'Community admins must set up co-admins that can serve as signatories and approve fund releases',
-            isCompleted: hasCoAdmins,
+          GestureDetector(
+            onTap: _showSelectCoAdminsModal,
+            child: _buildChecklistItem(
+              title: 'Add Co-admins',
+              subtitle: 'Community admins must set up co-admins that can serve as signatories and approve fund releases',
+              isCompleted: hasCoAdmins,
+            ),
           ),
           const SizedBox(height: 16),
-          _buildChecklistItem(
-            title: 'Set co admins as Signatories',
-            subtitle: 'Community admins must set up co-admins that can serve as signatories and approve fund releases',
-            isCompleted: hasSignatories,
+          GestureDetector(
+            onTap: () {
+              if (!hasCoAdmins) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Please add Co-admins first',
+                      style: TextStyle(fontFamily: AppTextStyles.fontFamily),
+                    ),
+                    backgroundColor: const Color(0xFFE65100),
+                  ),
+                );
+              } else {
+                // TODO: Navigate to set signatories or show modal
+                setState(() => _hasSetSignatories = true);
+              }
+            },
+            child: _buildChecklistItem(
+              title: 'Set co admins as Signatories',
+              subtitle: 'Community admins must set up co-admins that can serve as signatories and approve fund releases',
+              isCompleted: _hasSetSignatories,
+            ),
           ),
           const Spacer(),
           SizedBox(
@@ -291,6 +322,24 @@ class _CommunityWalletSetupPageState
           ),
           const SizedBox(height: 24),
         ],
+      ),
+    );
+  }
+
+  void _showSelectCoAdminsModal() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => _SelectCoAdminsModal(
+        coAdmins: _coAdmins,
+        selectedCoAdmins: _selectedCoAdmins,
+        onSelectionChanged: (selected) {
+          setState(() => _selectedCoAdmins = selected);
+        },
       ),
     );
   }
@@ -1058,6 +1107,204 @@ class _CommunityWalletSetupPageState
           ),
           const SizedBox(height: 24),
         ],
+      ),
+    );
+  }
+}
+
+/// Modal for selecting co-admins
+class _SelectCoAdminsModal extends StatefulWidget {
+  final List<MockCoAdmin> coAdmins;
+  final List<MockCoAdmin> selectedCoAdmins;
+  final Function(List<MockCoAdmin>) onSelectionChanged;
+
+  const _SelectCoAdminsModal({
+    required this.coAdmins,
+    required this.selectedCoAdmins,
+    required this.onSelectionChanged,
+  });
+
+  @override
+  State<_SelectCoAdminsModal> createState() => _SelectCoAdminsModalState();
+}
+
+class _SelectCoAdminsModalState extends State<_SelectCoAdminsModal> {
+  late List<MockCoAdmin> _selected;
+  String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _selected = List.from(widget.selectedCoAdmins);
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<MockCoAdmin> get _filteredCoAdmins {
+    if (_searchQuery.isEmpty) return widget.coAdmins;
+    return widget.coAdmins.where((coAdmin) {
+      return coAdmin.fullName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+          coAdmin.email.toLowerCase().contains(_searchQuery.toLowerCase());
+    }).toList();
+  }
+
+  void _toggleSelection(MockCoAdmin coAdmin) {
+    setState(() {
+      if (_selected.any((c) => c.userId == coAdmin.userId)) {
+        _selected.removeWhere((c) => c.userId == coAdmin.userId);
+      } else {
+        _selected.add(coAdmin);
+      }
+    });
+    widget.onSelectionChanged(_selected);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.7,
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Select Co-Admins',
+            style: TextStyle(
+              fontFamily: AppTextStyles.fontFamily,
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF333333),
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Search field
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE8E8E8)),
+            ),
+            child: TextField(
+              controller: _searchController,
+              onChanged: (value) => setState(() => _searchQuery = value),
+              decoration: InputDecoration(
+                hintText: 'Search members',
+                hintStyle: TextStyle(
+                  fontFamily: AppTextStyles.fontFamily,
+                  fontSize: 14,
+                  color: const Color(0xFF8E8E8E),
+                ),
+                prefixIcon: const Icon(Icons.search, color: Color(0xFF8E8E8E)),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Co-admins list
+          Expanded(
+            child: ListView.separated(
+              itemCount: _filteredCoAdmins.length,
+              separatorBuilder: (context, index) => const Divider(height: 1),
+              itemBuilder: (context, index) {
+                final coAdmin = _filteredCoAdmins[index];
+                final isSelected = _selected.any((c) => c.userId == coAdmin.userId);
+                return _buildCoAdminListItem(coAdmin, isSelected);
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCoAdminListItem(MockCoAdmin coAdmin, bool isSelected) {
+    return InkWell(
+      onTap: () => _toggleSelection(coAdmin),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Row(
+          children: [
+            // Avatar
+            CircleAvatar(
+              radius: 24,
+              backgroundColor: const Color(0xFFE8E8E8),
+              backgroundImage: coAdmin.photo != null ? NetworkImage(coAdmin.photo!) : null,
+              child: coAdmin.photo == null
+                  ? Text(
+                      coAdmin.fullName.isNotEmpty ? coAdmin.fullName[0].toUpperCase() : 'C',
+                      style: TextStyle(
+                        fontFamily: AppTextStyles.fontFamily,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF606060),
+                      ),
+                    )
+                  : null,
+            ),
+            const SizedBox(width: 12),
+            // Name and email
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        coAdmin.fullName,
+                        style: TextStyle(
+                          fontFamily: AppTextStyles.fontFamily,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF282637),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFE5A84B)),
+                        ),
+                        child: Text(
+                          'co-admin',
+                          style: TextStyle(
+                            fontFamily: AppTextStyles.fontFamily,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                            color: const Color(0xFFE5A84B),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    coAdmin.email,
+                    style: TextStyle(
+                      fontFamily: AppTextStyles.fontFamily,
+                      fontSize: 12,
+                      color: const Color(0xFF8E8E8E),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Selection indicator
+            if (isSelected)
+              Icon(
+                Icons.check_circle,
+                color: AppColors.primary,
+                size: 24,
+              ),
+          ],
+        ),
       ),
     );
   }

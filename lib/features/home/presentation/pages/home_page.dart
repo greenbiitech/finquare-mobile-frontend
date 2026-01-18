@@ -41,6 +41,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         height: 64,
         width: 64,
         child: FloatingActionButton(
+          heroTag: 'home_fab',
           onPressed: () {
             // TODO: Navigate to create hub/community action
           },

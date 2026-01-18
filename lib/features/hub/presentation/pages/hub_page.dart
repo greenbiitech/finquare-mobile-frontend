@@ -45,6 +45,7 @@ class _HubPageState extends ConsumerState<HubPage> {
     return Scaffold(
       backgroundColor: Colors.white,
       floatingActionButton: FloatingActionButton(
+        heroTag: 'hub_fab',
         backgroundColor: AppColors.primary,
         onPressed: () {
           context.push(AppRoutes.createHub);

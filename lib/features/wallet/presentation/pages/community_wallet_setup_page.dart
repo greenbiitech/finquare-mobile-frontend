@@ -220,18 +220,22 @@ class _CommunityWalletSetupPageState
   }
 
   /// Step 1: Wallet Checklist
-  /// TODO: Match to Figma design
   Widget _buildChecklistStep() {
+    // TODO: These should come from backend - check if co-admins exist and signatories are set
+    final bool hasCoAdmins = false; // Mock: set to true when co-admins are added
+    final bool hasSignatories = false; // Mock: set to true when signatories are set
+    final bool canContinue = hasCoAdmins && hasSignatories;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(height: 60),
+          const SizedBox(height: 20),
           AppBackButton(onTap: () => context.pop()),
           const SizedBox(height: 22),
           Text(
-            'Wallet Checklist',
+            'Wallet checklist',
             style: TextStyle(
               fontFamily: AppTextStyles.fontFamily,
               fontSize: 20,
@@ -239,36 +243,27 @@ class _CommunityWalletSetupPageState
               color: const Color(0xFF333333),
             ),
           ),
-          const SizedBox(height: 5),
+          const SizedBox(height: 8),
           Text(
-            'Complete these steps to activate your community wallet',
+            'Before you can create a community wallet we need you to do the following',
             style: TextStyle(
               fontFamily: AppTextStyles.fontFamily,
               fontSize: 14,
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w400,
               color: const Color(0xFF606060),
             ),
           ),
-          const SizedBox(height: 32),
+          const SizedBox(height: 24),
           _buildChecklistItem(
-            icon: Icons.people_outline,
-            title: 'Set up Signatories',
-            subtitle: 'Select who can approve withdrawals',
-            isCompleted: false,
+            title: 'Add Co-admins',
+            subtitle: 'Community admins must set up co-admins that can serve as signatories and approve fund releases',
+            isCompleted: hasCoAdmins,
           ),
           const SizedBox(height: 16),
           _buildChecklistItem(
-            icon: Icons.rule,
-            title: 'Set up Approval Rules',
-            subtitle: 'Configure approval percentage',
-            isCompleted: false,
-          ),
-          const SizedBox(height: 16),
-          _buildChecklistItem(
-            icon: Icons.lock_outline,
-            title: 'Create Transaction PIN',
-            subtitle: 'Secure your community wallet',
-            isCompleted: false,
+            title: 'Set co admins as Signatories',
+            subtitle: 'Community admins must set up co-admins that can serve as signatories and approve fund releases',
+            isCompleted: hasSignatories,
           ),
           const Spacer(),
           SizedBox(
@@ -276,20 +271,20 @@ class _CommunityWalletSetupPageState
             height: 54,
             child: ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
+                backgroundColor: canContinue ? AppColors.primary : const Color(0xFFF5F5F5),
                 elevation: 0,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(43),
                 ),
               ),
-              onPressed: _nextStep,
+              onPressed: canContinue ? _nextStep : null,
               child: Text(
-                'Start Setup',
+                'Continue',
                 style: TextStyle(
                   fontFamily: AppTextStyles.fontFamily,
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
-                  color: Colors.white,
+                  color: canContinue ? Colors.white : const Color(0xFFBDBDBD),
                 ),
               ),
             ),
@@ -301,7 +296,6 @@ class _CommunityWalletSetupPageState
   }
 
   Widget _buildChecklistItem({
-    required IconData icon,
     required String title,
     required String subtitle,
     required bool isCompleted,
@@ -309,49 +303,47 @@ class _CommunityWalletSetupPageState
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFF9F9F9),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFE8E8E8)),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: isCompleted ? AppColors.primary : const Color(0xFFE8E8E8),
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: Icon(
-              isCompleted ? Icons.check : icon,
-              color: isCompleted ? Colors.white : const Color(0xFF606060),
-              size: 24,
+          Text(
+            title,
+            style: TextStyle(
+              fontFamily: AppTextStyles.fontFamily,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: const Color(0xFF282637),
             ),
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontFamily: AppTextStyles.fontFamily,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: const Color(0xFF282637),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    fontFamily: AppTextStyles.fontFamily,
-                    fontSize: 12,
-                    color: const Color(0xFF8E8E8E),
-                  ),
-                ),
-              ],
+          const SizedBox(height: 8),
+          Text(
+            subtitle,
+            style: TextStyle(
+              fontFamily: AppTextStyles.fontFamily,
+              fontSize: 14,
+              fontWeight: FontWeight.w400,
+              color: const Color(0xFF606060),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: isCompleted ? const Color(0xFFE8F5E9) : const Color(0xFFFFF3E0),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Text(
+              isCompleted ? 'Done' : 'Not Done',
+              style: TextStyle(
+                fontFamily: AppTextStyles.fontFamily,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: isCompleted ? const Color(0xFF4CAF50) : const Color(0xFFE65100),
+              ),
             ),
           ),
         ],

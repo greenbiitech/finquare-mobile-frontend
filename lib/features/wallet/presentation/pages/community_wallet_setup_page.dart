@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:finsquare_mobile_app/config/theme/app_theme.dart';
+import 'package:finsquare_mobile_app/core/widgets/back_button.dart';
 
 /// Community Wallet Setup Steps
 enum CommunityWalletSetupStep {
@@ -152,9 +153,13 @@ class _CommunityWalletSetupPageState
 
   @override
   Widget build(BuildContext context) {
+    // Checklist and Success screens don't have AppBar
+    final showAppBar = _currentStep != CommunityWalletSetupStep.checklist &&
+        _currentStep != CommunityWalletSetupStep.success;
+
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: _currentStep != CommunityWalletSetupStep.success
+      appBar: showAppBar
           ? AppBar(
               backgroundColor: Colors.white,
               elevation: 0,
@@ -218,15 +223,29 @@ class _CommunityWalletSetupPageState
   /// TODO: Match to Figma design
   Widget _buildChecklistStep() {
     return Padding(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          const SizedBox(height: 60),
+          AppBackButton(onTap: () => context.pop()),
+          const SizedBox(height: 22),
+          Text(
+            'Wallet Checklist',
+            style: TextStyle(
+              fontFamily: AppTextStyles.fontFamily,
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF333333),
+            ),
+          ),
+          const SizedBox(height: 5),
           Text(
             'Complete these steps to activate your community wallet',
             style: TextStyle(
               fontFamily: AppTextStyles.fontFamily,
               fontSize: 14,
+              fontWeight: FontWeight.w500,
               color: const Color(0xFF606060),
             ),
           ),

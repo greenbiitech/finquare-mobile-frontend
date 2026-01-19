@@ -426,6 +426,15 @@ Money flows INTO the Community Wallet from:
 | **Signatory replacement** | If signatory leaves, Admin must designate replacement |
 | **No member visibility** | Wallet is completely hidden from regular members |
 
+### Balance Source
+> **Important**: Community Wallet balance is fetched from the **local database**, NOT from 9PSB.
+>
+> Unlike personal wallets (which sync balance from 9PSB WAAS), community wallet balance is managed internally in our database. This is by design - the balance is updated internally when:
+> - Dues payments are received
+> - Esusu contributions are made
+> - Other community financial activities occur
+> - Withdrawals are processed
+
 ---
 
 ### Wallet Creation Flow (Detailed)

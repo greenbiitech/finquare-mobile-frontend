@@ -713,6 +713,40 @@ class WalletRepository {
   Future<void> deleteWithdrawalAccount() async {
     await _apiClient.delete(ApiEndpoints.withdrawalAccount);
   }
+
+  // ============================================
+  // COMMUNITY WALLET
+  // ============================================
+
+  /// Get co-admins for signatory selection
+  Future<List<CoAdmin>> getCoAdmins(String communityId) async {
+    final response = await _apiClient.get(ApiEndpoints.getCoAdmins(communityId));
+    final data = response.data['data'];
+    if (data == null) return [];
+
+    if (data is List) {
+      return data.map((e) => CoAdmin.fromJson(e as Map<String, dynamic>)).toList();
+    }
+    return [];
+  }
+
+  /// Check community wallet eligibility
+  Future<CommunityWalletEligibility> checkWalletEligibility(String communityId) async {
+    final response = await _apiClient.get(ApiEndpoints.getWalletEligibility(communityId));
+    return CommunityWalletEligibility.fromJson(response.data);
+  }
+
+  /// Create community wallet
+  Future<CommunityWalletResponse> createCommunityWallet(
+    String communityId,
+    CreateCommunityWalletRequest request,
+  ) async {
+    final response = await _apiClient.post(
+      ApiEndpoints.createCommunityWallet(communityId),
+      data: request.toJson(),
+    );
+    return CommunityWalletResponse.fromJson(response.data);
+  }
 }
 
 /// Bank Model
@@ -797,6 +831,103 @@ class CreateWithdrawalAccountRequest {
     'accountNumber': accountNumber,
     'accountName': accountName,
   };
+}
+
+// ============================================
+// COMMUNITY WALLET MODELS
+// ============================================
+
+/// Co-Admin Model for community wallet signatories
+class CoAdmin {
+  final String odooId;
+  final String odooName;
+  final String odooEmail;
+  final String? odooPhoto;
+
+  CoAdmin({
+    required this.odooId,
+    required this.odooName,
+    required this.odooEmail,
+    this.odooPhoto,
+  });
+
+  factory CoAdmin.fromJson(Map<String, dynamic> json) {
+    return CoAdmin(
+      odooId: json['odooId']?.toString() ?? json['id']?.toString() ?? '',
+      odooName: json['odooName'] ?? json['fullName'] ?? json['name'] ?? '',
+      odooEmail: json['odooEmail'] ?? json['email'] ?? '',
+      odooPhoto: json['odooPhoto'] ?? json['photo'],
+    );
+  }
+}
+
+/// Community Wallet Eligibility Response
+class CommunityWalletEligibility {
+  final bool eligible;
+  final bool hasPersonalWallet;
+  final int coAdminCount;
+  final String? reason;
+
+  CommunityWalletEligibility({
+    required this.eligible,
+    required this.hasPersonalWallet,
+    required this.coAdminCount,
+    this.reason,
+  });
+
+  factory CommunityWalletEligibility.fromJson(Map<String, dynamic> json) {
+    final data = json['data'] as Map<String, dynamic>? ?? json;
+    return CommunityWalletEligibility(
+      eligible: data['eligible'] ?? false,
+      hasPersonalWallet: data['hasPersonalWallet'] ?? false,
+      coAdminCount: data['coAdminCount'] ?? 0,
+      reason: data['reason'],
+    );
+  }
+}
+
+/// Create Community Wallet Request
+class CreateCommunityWalletRequest {
+  final List<String> signatoryIds;
+  final String approvalRule;
+  final String transactionPin;
+
+  CreateCommunityWalletRequest({
+    required this.signatoryIds,
+    required this.approvalRule,
+    required this.transactionPin,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'signatoryIds': signatoryIds,
+    'approvalRule': approvalRule,
+    'transactionPin': transactionPin,
+  };
+}
+
+/// Community Wallet Response
+class CommunityWalletResponse {
+  final bool success;
+  final String message;
+  final String? walletId;
+  final String? accountNumber;
+
+  CommunityWalletResponse({
+    required this.success,
+    required this.message,
+    this.walletId,
+    this.accountNumber,
+  });
+
+  factory CommunityWalletResponse.fromJson(Map<String, dynamic> json) {
+    final data = json['data'] as Map<String, dynamic>?;
+    return CommunityWalletResponse(
+      success: json['success'] ?? false,
+      message: json['message'] ?? '',
+      walletId: data?['walletId'] ?? data?['id'],
+      accountNumber: data?['accountNumber'],
+    );
+  }
 }
 
 /// Resolve Account Response Model

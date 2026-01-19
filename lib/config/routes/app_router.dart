@@ -53,6 +53,14 @@ import 'package:finsquare_mobile_app/features/dues/data/models/due_creation_data
 import 'package:finsquare_mobile_app/features/community/presentation/pages/manage_community_page.dart';
 import 'package:finsquare_mobile_app/features/community/presentation/pages/members_page.dart';
 import 'package:finsquare_mobile_app/features/wallet/presentation/pages/community_wallet_setup_page.dart';
+import 'package:finsquare_mobile_app/features/esusu/presentation/pages/esusu_welcome_page.dart';
+import 'package:finsquare_mobile_app/features/esusu/presentation/pages/configure_esusu_page.dart';
+import 'package:finsquare_mobile_app/features/esusu/presentation/pages/add_participants_page.dart';
+import 'package:finsquare_mobile_app/features/esusu/presentation/pages/select_payout_order_page.dart';
+import 'package:finsquare_mobile_app/features/esusu/presentation/pages/esusu_success_page.dart';
+import 'package:finsquare_mobile_app/features/esusu/presentation/pages/esusu_list_page.dart';
+import 'package:finsquare_mobile_app/features/esusu/presentation/pages/esusu_detail_page.dart';
+import 'package:finsquare_mobile_app/features/esusu/presentation/pages/active_esusu_detail_page.dart';
 
 part 'app_router.g.dart';
 
@@ -111,6 +119,16 @@ abstract class AppRoutes {
   static const String createNewDues = '/create-new-dues';
   static const String configureDues = '/configure-dues';
   static const String duesSuccess = '/dues-success';
+
+  // Esusu routes
+  static const String esusuList = '/esusu-list';
+  static const String esusuDetail = '/esusu-detail';
+  static const String activeEsusuDetail = '/active-esusu-detail';
+  static const String esusuWelcome = '/esusu-welcome';
+  static const String configureEsusu = '/configure-esusu';
+  static const String addParticipants = '/add-participants';
+  static const String selectPayoutOrder = '/select-payout-order';
+  static const String esusuSuccess = '/esusu-success';
 
   // Community management routes
   static const String manageCommunity = '/manage-community';
@@ -477,6 +495,55 @@ GoRouter appRouter(Ref ref) {
           final dueData = state.extra as DueCreationData?;
           return DuesSuccessPage(dueData: dueData);
         },
+      ),
+      // Esusu routes
+      GoRoute(
+        path: AppRoutes.esusuList,
+        name: 'esusuList',
+        builder: (context, state) => const EsusuListPage(),
+      ),
+      GoRoute(
+        path: '${AppRoutes.esusuDetail}/:esusuId',
+        name: 'esusuDetail',
+        builder: (context, state) {
+          final esusuId = state.pathParameters['esusuId'] ?? '';
+          final esusuName = state.uri.queryParameters['name'] ?? 'Esusu';
+          return EsusuDetailPage(esusuId: esusuId, esusuName: esusuName);
+        },
+      ),
+      GoRoute(
+        path: '${AppRoutes.activeEsusuDetail}/:esusuId',
+        name: 'activeEsusuDetail',
+        builder: (context, state) {
+          final esusuId = state.pathParameters['esusuId'] ?? '';
+          final esusuName = state.uri.queryParameters['name'] ?? 'Esusu';
+          return ActiveEsusuDetailPage(esusuId: esusuId, esusuName: esusuName);
+        },
+      ),
+      GoRoute(
+        path: AppRoutes.esusuWelcome,
+        name: 'esusuWelcome',
+        builder: (context, state) => const EsusuWelcomePage(),
+      ),
+      GoRoute(
+        path: AppRoutes.configureEsusu,
+        name: 'configureEsusu',
+        builder: (context, state) => const ConfigureEsusuPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.addParticipants,
+        name: 'addParticipants',
+        builder: (context, state) => const AddParticipantsPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.selectPayoutOrder,
+        name: 'selectPayoutOrder',
+        builder: (context, state) => const SelectPayoutOrderPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.esusuSuccess,
+        name: 'esusuSuccess',
+        builder: (context, state) => const EsusuSuccessPage(),
       ),
       // Community management routes
       GoRoute(

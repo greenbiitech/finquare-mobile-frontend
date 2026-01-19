@@ -118,6 +118,7 @@ flutter:
     - assets/svgs/
     - assets/svgs/hub/
     - assets/svgs/dues/
+    - assets/svgs/esusu/
     - assets/animations/
 
   # Fonts

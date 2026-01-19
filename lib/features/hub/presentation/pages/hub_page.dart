@@ -352,7 +352,7 @@ class _HubPageState extends ConsumerState<HubPage> {
           crossAxisSpacing: 12,
           mainAxisSpacing: 12,
           children: [
-            _buildFinanceItem('Esusu', 'assets/svgs/hub/esusu.svg', 0, _esusuBgColor, _esusuTextColor),
+            _buildFinanceItem('Esusu', 'assets/svgs/hub/esusu.svg', 0, _esusuBgColor, _esusuTextColor, onTap: () => context.push(AppRoutes.esusuList)),
             _buildFinanceItem('Dues', 'assets/svgs/hub/dues.svg', 0, _duesBgColor, _duesTextColor),
             _buildFinanceItem('Contributions', 'assets/svgs/hub/contributions.svg', 0, _contributionsBgColor, _contributionsTextColor),
             _buildFinanceItem('Group Buying', 'assets/svgs/hub/group_buying.svg', 0, _groupBuyBgColor, _groupBuyTextColor),
@@ -368,12 +368,11 @@ class _HubPageState extends ConsumerState<HubPage> {
     String svgPath,
     int count,
     Color bgColor,
-    Color textColor,
-  ) {
+    Color textColor, {
+    VoidCallback? onTap,
+  }) {
     return GestureDetector(
-      onTap: () {
-        // TODO: Handle finance item tap
-      },
+      onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(8),

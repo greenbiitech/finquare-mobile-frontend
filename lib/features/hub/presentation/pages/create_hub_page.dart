@@ -83,6 +83,9 @@ class CreateHubPage extends ConsumerWidget {
                   description:
                       'Join or start an Esusu — take turns, grow wealth, stay committed. Community-powered saving made simple.',
                   svgPath: 'assets/svgs/esusu.svg',
+                  onTap: () {
+                    context.push(AppRoutes.esusuWelcome);
+                  },
                 ),
                 const SizedBox(height: 20),
                 _buildHubCard(

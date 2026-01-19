@@ -211,7 +211,7 @@ class BvnVerificationMethod {
 
 /// BVN Method Option Model (from Mono API)
 class BvnMethodOption {
-  final String method; // 'phone' or 'email'
+  final String method; // 'phone', 'email', or 'alternate_phone'
   final String hint; // e.g. 'Sms will be sent to 0903***8859'
 
   BvnMethodOption({
@@ -228,6 +228,7 @@ class BvnMethodOption {
 
   bool get isEmail => method.toLowerCase() == 'email';
   bool get isPhone => method.toLowerCase() == 'phone';
+  bool get isAlternatePhone => method.toLowerCase() == 'alternate_phone';
 }
 
 /// BVN Initiate Response Model
@@ -556,16 +557,23 @@ class WalletRepository {
 
   /// Step 2: Select verification method and send OTP
   /// Called after user enters full credential on Verify BVN Credentials page
+  /// For alternate_phone method, phoneNumber is required
   Future<BvnVerifyResponse> verifyBvnMethod({
     required String sessionId,
     required String method,
+    String? phoneNumber,
   }) async {
+    final data = <String, dynamic>{
+      'sessionId': sessionId,
+      'method': method,
+    };
+    // Include phone number for alternate_phone method
+    if (method == 'alternate_phone' && phoneNumber != null) {
+      data['phoneNumber'] = phoneNumber;
+    }
     final response = await _apiClient.post(
       ApiEndpoints.bvnVerify,
-      data: {
-        'sessionId': sessionId,
-        'method': method,
-      },
+      data: data,
     );
     return BvnVerifyResponse.fromJson(response.data);
   }

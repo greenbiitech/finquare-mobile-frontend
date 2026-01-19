@@ -25,7 +25,7 @@ class VerifyBvnCredentialsPage extends ConsumerStatefulWidget {
   });
 
   final String sessionId;
-  final String method; // 'phone' or 'email'
+  final String method; // 'phone', 'email', or 'alternate_phone'
 
   @override
   ConsumerState<VerifyBvnCredentialsPage> createState() =>
@@ -38,6 +38,8 @@ class _VerifyBvnCredentialsPageState
   bool _isLoading = false;
 
   bool get _isEmail => widget.method.toLowerCase() == 'email';
+  bool get _isAlternatePhone => widget.method.toLowerCase() == 'alternate_phone';
+  bool get _isPhone => widget.method.toLowerCase() == 'phone' || _isAlternatePhone;
 
   @override
   void initState() {
@@ -56,7 +58,8 @@ class _VerifyBvnCredentialsPageState
     if (_isEmail) {
       return RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value);
     } else {
-      return RegExp(r'^\d{10,11}$').hasMatch(value);
+      // Phone number validation for both 'phone' and 'alternate_phone'
+      return RegExp(r'^0[789]\d{9}$').hasMatch(value);
     }
   }
 
@@ -76,6 +79,8 @@ class _VerifyBvnCredentialsPageState
       final response = await walletRepo.verifyBvnMethod(
         sessionId: widget.sessionId,
         method: widget.method,
+        // Pass phone number for alternate_phone method
+        phoneNumber: _isAlternatePhone ? _credentialController.text.trim() : null,
       );
 
       if (!mounted) return;
@@ -104,6 +109,26 @@ class _VerifyBvnCredentialsPageState
     }
   }
 
+  String get _pageTitle {
+    if (_isEmail) {
+      return 'Verify your Email';
+    } else if (_isAlternatePhone) {
+      return 'Enter Alternate Phone Number';
+    } else {
+      return 'Verify your Phone Number';
+    }
+  }
+
+  String get _pageDescription {
+    if (_isEmail) {
+      return 'Please enter your complete email address linked to your BVN to receive a verification code.';
+    } else if (_isAlternatePhone) {
+      return 'Please enter your alternate phone number to receive a verification code.';
+    } else {
+      return 'Please enter your complete phone number linked to your BVN to receive a verification code.';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final canContinue = _isValid && !_isLoading;
@@ -124,7 +149,7 @@ class _VerifyBvnCredentialsPageState
                 SvgPicture.asset('assets/svgs/pagination_dots.svg'),
                 const SizedBox(height: 15),
                 Text(
-                  'Verify your ${_isEmail ? 'Email' : 'Phone Number'}',
+                  _pageTitle,
                   style: TextStyle(
                     fontFamily: AppTextStyles.fontFamily,
                     fontSize: 20,
@@ -134,7 +159,7 @@ class _VerifyBvnCredentialsPageState
                 ),
                 const SizedBox(height: 5),
                 Text(
-                  'Please enter your complete ${_isEmail ? 'email address' : 'phone number'} linked to your BVN to receive a verification code.',
+                  _pageDescription,
                   style: TextStyle(
                     fontFamily: AppTextStyles.fontFamily,
                     fontSize: 14,
@@ -160,9 +185,9 @@ class _VerifyBvnCredentialsPageState
                           ? null
                           : 'Please enter a valid email address';
                     } else {
-                      return RegExp(r'^\d{10,11}$').hasMatch(value)
+                      return RegExp(r'^0[789]\d{9}$').hasMatch(value)
                           ? null
-                          : 'Please enter a valid phone number';
+                          : 'Please enter a valid phone number (e.g., 08012345678)';
                     }
                   },
                 ),

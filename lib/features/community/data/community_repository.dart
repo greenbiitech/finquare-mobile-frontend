@@ -1266,8 +1266,8 @@ class CommunityRepository {
   Future<SwitchCommunityResponse> switchActiveCommunity(
     String communityId,
   ) async {
-    final response = await _apiClient.patch(
-      ApiEndpoints.switchActiveCommunity(communityId),
+    final response = await _apiClient.post(
+      ApiEndpoints.switchCommunity(communityId),
     );
     return SwitchCommunityResponse.fromJson(response.data);
   }
@@ -1282,9 +1282,8 @@ class CommunityRepository {
     List<String> userIds,
   ) async {
     final response = await _apiClient.post(
-      ApiEndpoints.addCoAdmins,
+      ApiEndpoints.addCoAdmins(communityId),
       data: {
-        'communityId': communityId,
         'userIds': userIds,
       },
     );
@@ -1297,9 +1296,8 @@ class CommunityRepository {
     String userId,
   ) async {
     final response = await _apiClient.post(
-      ApiEndpoints.removeAdmin,
+      ApiEndpoints.removeCoAdmin(communityId),
       data: {
-        'communityId': communityId,
         'userId': userId,
       },
     );

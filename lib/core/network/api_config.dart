@@ -28,9 +28,9 @@ class ApiEndpoints {
   static const String activeCommunity = '/communities/active';
   static const String myCommunities = '/communities/my-communities';
 
-  /// Switch active community: /communities/switch-active/{communityId}
-  static String switchActiveCommunity(String communityId) =>
-      '/communities/switch-active/$communityId';
+  /// Switch active community: /communities/{communityId}/switch
+  static String switchCommunity(String communityId) =>
+      '/communities/$communityId/switch';
 
   /// Check community name availability: /communities/check-name/{name}
   static String checkCommunityName(String name) => '/communities/check-name/$name';
@@ -73,11 +73,13 @@ class ApiEndpoints {
   static String createCommunityWallet(String communityId) =>
       '/communities/$communityId/wallet';
 
-  /// Add co-admins: /communities/add-co-admins
-  static const String addCoAdmins = '/communities/add-co-admins';
+  /// Add co-admins: /communities/{communityId}/add-co-admins
+  static String addCoAdmins(String communityId) =>
+      '/communities/$communityId/add-co-admins';
 
-  /// Remove co-admin: /communities/remove-admin
-  static const String removeAdmin = '/communities/remove-admin';
+  /// Remove co-admin: /communities/{communityId}/remove-co-admin
+  static String removeCoAdmin(String communityId) =>
+      '/communities/$communityId/remove-co-admin';
 
   /// Get join requests: /communities/{communityId}/join-requests
   static String getJoinRequests(String communityId) =>

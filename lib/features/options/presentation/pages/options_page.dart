@@ -44,8 +44,8 @@ class _OptionsPageState extends ConsumerState<OptionsPage> {
     final int communitiesCreatedCount = communityState.userCommunitiesCreated.length;
 
     // Get member count from active community (minimum 1 since admin is always a member)
-    final int memberCount = (communityState.activeCommunity?.members.length ?? 0) > 0
-        ? communityState.activeCommunity!.members.length
+    final int memberCount = (communityState.activeCommunity?.memberCount ?? 0) > 0
+        ? communityState.activeCommunity!.memberCount
         : 1;
 
     // Get user role in active community

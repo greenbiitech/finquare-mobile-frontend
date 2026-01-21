@@ -41,6 +41,7 @@ class ActiveCommunity {
   final String? logo;
   final String? color;
   final bool isDefault;
+  final int memberCount;
   final List<ActiveCommunityMember> members;
 
   ActiveCommunity({
@@ -51,6 +52,7 @@ class ActiveCommunity {
     this.logo,
     this.color,
     this.isDefault = false,
+    this.memberCount = 0,
     this.members = const [],
   });
 
@@ -73,6 +75,7 @@ class ActiveCommunity {
       logo: json['logo'],
       color: json['color'],
       isDefault: json['isDefault'] ?? false,
+      memberCount: json['memberCount'] ?? membersList.length,
       members: membersList
           .map((m) => ActiveCommunityMember.fromJson(m as Map<String, dynamic>))
           .toList(),

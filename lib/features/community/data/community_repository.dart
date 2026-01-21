@@ -1062,6 +1062,23 @@ class RemoveCoAdminResponse {
   }
 }
 
+class RemoveMemberResponse {
+  final bool success;
+  final String message;
+
+  RemoveMemberResponse({
+    required this.success,
+    required this.message,
+  });
+
+  factory RemoveMemberResponse.fromJson(Map<String, dynamic> json) {
+    return RemoveMemberResponse(
+      success: json['success'] ?? false,
+      message: json['message'] ?? '',
+    );
+  }
+}
+
 /// Community Repository
 class CommunityRepository {
   final ApiClient _apiClient;
@@ -1302,6 +1319,20 @@ class CommunityRepository {
       },
     );
     return RemoveCoAdminResponse.fromJson(response.data);
+  }
+
+  /// Remove member from community
+  Future<RemoveMemberResponse> removeMember(
+    String communityId,
+    String userId,
+  ) async {
+    final response = await _apiClient.post(
+      ApiEndpoints.removeMember(communityId),
+      data: {
+        'userId': userId,
+      },
+    );
+    return RemoveMemberResponse.fromJson(response.data);
   }
 
   // =====================================================

@@ -81,6 +81,10 @@ class ApiEndpoints {
   static String removeCoAdmin(String communityId) =>
       '/communities/$communityId/remove-co-admin';
 
+  /// Remove member: /communities/{communityId}/remove-member
+  static String removeMember(String communityId) =>
+      '/communities/$communityId/remove-member';
+
   /// Get join requests: /communities/{communityId}/join-requests
   static String getJoinRequests(String communityId) =>
       '/communities/$communityId/join-requests';

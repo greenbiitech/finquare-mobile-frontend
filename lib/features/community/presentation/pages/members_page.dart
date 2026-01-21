@@ -9,6 +9,7 @@ import 'package:finsquare_mobile_app/core/widgets/back_button.dart';
 import 'package:finsquare_mobile_app/features/community/data/community_repository.dart';
 import 'package:finsquare_mobile_app/features/community/presentation/providers/community_provider.dart';
 import 'package:finsquare_mobile_app/features/auth/presentation/providers/auth_provider.dart';
+import 'package:finsquare_mobile_app/features/community/presentation/pages/member_details_page.dart';
 
 // Colors matching old Greencard codebase
 const Color _primaryColor = Color(0xFF21A8FB);
@@ -795,29 +796,32 @@ class _MembersPageState extends ConsumerState<MembersPage> {
   }
 
   void _showMemberDetails(CommunityMember member) {
-    // TODO: Navigate to member details page
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(
-          member.user.fullName,
-          style: TextStyle(fontFamily: AppTextStyles.fontFamily),
+    // Determine current user's role
+    final authState = ref.read(authProvider);
+    final currentUserId = authState.user?.id;
+    String currentUserRole = 'MEMBER';
+
+    if (currentUserId != null) {
+      final userMembership = _members.where((m) => m.user.id == currentUserId).firstOrNull;
+      if (userMembership != null) {
+        currentUserRole = userMembership.role;
+      } else {
+        final communityState = ref.read(communityProvider);
+        currentUserRole = communityState.userRoleInActiveCommunity ?? 'MEMBER';
+      }
+    }
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => MemberDetailsPage(
+          communityId: widget.communityId,
+          member: member,
+          currentUserRole: currentUserRole,
+          onMemberUpdated: () {
+            // Refresh data when returning from member details
+            _fetchMembers();
+          },
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Email: ${member.user.email}'),
-            Text('Role: ${_getRoleDisplayText(member.role)}'),
-            if (member.user.phoneNumber != null) Text('Phone: ${member.user.phoneNumber}'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Close'),
-          ),
-        ],
       ),
     );
   }

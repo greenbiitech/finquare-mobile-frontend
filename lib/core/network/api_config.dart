@@ -153,4 +153,12 @@ class ApiEndpoints {
   /// Get community members for Esusu participant selection: /esusu/{communityId}/members
   static String esusuCommunityMembers(String communityId) =>
       '/esusu/$communityId/members';
+
+  /// Get Esusu count for Hub display: /esusu/hub-count/{communityId}
+  static String esusuHubCount(String communityId) =>
+      '/esusu/hub-count/$communityId';
+
+  /// Get Esusu list: /esusu/list/{communityId}
+  static String esusuList(String communityId) =>
+      '/esusu/list/$communityId';
 }

@@ -511,4 +511,199 @@ class EsusuRepository {
     );
     return CreateEsusuResponse.fromJson(response.data);
   }
+
+  /// Get Esusu count for Hub display
+  Future<EsusuHubCountResponse> getHubCount(String communityId) async {
+    final response = await _apiClient.get(
+      ApiEndpoints.esusuHubCount(communityId),
+    );
+    return EsusuHubCountResponse.fromJson(response.data);
+  }
+
+  /// Get Esusu list
+  Future<EsusuListResponse> getEsusuList(
+    String communityId, {
+    bool archived = false,
+  }) async {
+    final response = await _apiClient.get(
+      '${ApiEndpoints.esusuList(communityId)}${archived ? '?archived=true' : ''}',
+    );
+    return EsusuListResponse.fromJson(response.data);
+  }
+}
+
+// =====================================================
+// HUB COUNT MODELS
+// =====================================================
+
+/// Esusu Hub Count Response Model
+class EsusuHubCountResponse {
+  final bool success;
+  final int total;
+  final int active;
+  final int pendingMembers;
+  final int? pendingInvitation;
+  final bool isAdmin;
+
+  EsusuHubCountResponse({
+    required this.success,
+    required this.total,
+    required this.active,
+    required this.pendingMembers,
+    this.pendingInvitation,
+    required this.isAdmin,
+  });
+
+  factory EsusuHubCountResponse.fromJson(Map<String, dynamic> json) {
+    final data = json['data'] as Map<String, dynamic>?;
+
+    return EsusuHubCountResponse(
+      success: json['success'] ?? false,
+      total: data?['total'] ?? 0,
+      active: data?['active'] ?? 0,
+      pendingMembers: data?['pendingMembers'] ?? 0,
+      pendingInvitation: data?['pendingInvitation'],
+      isAdmin: data?['isAdmin'] ?? false,
+    );
+  }
+}
+
+// =====================================================
+// ESUSU LIST MODELS
+// =====================================================
+
+/// Esusu List Item Model
+class EsusuListItem {
+  final String id;
+  final String name;
+  final EsusuStatus status;
+  final EsusuInviteStatus? inviteStatus;
+  final int? slotNumber;
+  final String? iconUrl;
+  final double contributionAmount;
+  final PaymentFrequency frequency;
+  final int numberOfParticipants;
+  final int currentCycle;
+  final int totalCycles;
+  final DateTime? nextPayoutDate;
+  final int? daysUntilPayout;
+  final double progress;
+  final int? acceptedCount;
+  final int? pendingCount;
+  final DateTime participationDeadline;
+  final bool isCreator;
+  final String creatorName;
+
+  EsusuListItem({
+    required this.id,
+    required this.name,
+    required this.status,
+    this.inviteStatus,
+    this.slotNumber,
+    this.iconUrl,
+    required this.contributionAmount,
+    required this.frequency,
+    required this.numberOfParticipants,
+    required this.currentCycle,
+    required this.totalCycles,
+    this.nextPayoutDate,
+    this.daysUntilPayout,
+    required this.progress,
+    this.acceptedCount,
+    this.pendingCount,
+    required this.participationDeadline,
+    required this.isCreator,
+    required this.creatorName,
+  });
+
+  factory EsusuListItem.fromJson(Map<String, dynamic> json) {
+    return EsusuListItem(
+      id: json['id'] ?? '',
+      name: json['name'] ?? '',
+      status: EsusuStatus.fromString(json['status'] ?? 'PENDING_MEMBERS'),
+      inviteStatus: json['inviteStatus'] != null
+          ? EsusuInviteStatus.fromString(json['inviteStatus'])
+          : null,
+      slotNumber: json['slotNumber'],
+      iconUrl: json['iconUrl'],
+      contributionAmount: (json['contributionAmount'] ?? 0).toDouble(),
+      frequency: PaymentFrequency.fromString(json['frequency'] ?? 'MONTHLY'),
+      numberOfParticipants: json['numberOfParticipants'] ?? 0,
+      currentCycle: json['currentCycle'] ?? 0,
+      totalCycles: json['totalCycles'] ?? 0,
+      nextPayoutDate: json['nextPayoutDate'] != null
+          ? DateTime.parse(json['nextPayoutDate'])
+          : null,
+      daysUntilPayout: json['daysUntilPayout'],
+      progress: (json['progress'] ?? 0).toDouble(),
+      acceptedCount: json['acceptedCount'],
+      pendingCount: json['pendingCount'],
+      participationDeadline: DateTime.parse(
+          json['participationDeadline'] ?? DateTime.now().toIso8601String()),
+      isCreator: json['isCreator'] ?? false,
+      creatorName: json['creatorName'] ?? '',
+    );
+  }
+}
+
+/// Esusu Invite Status Enum
+enum EsusuInviteStatus {
+  invited,
+  accepted,
+  declined,
+  expired;
+
+  static EsusuInviteStatus fromString(String value) {
+    switch (value.toUpperCase()) {
+      case 'INVITED':
+        return EsusuInviteStatus.invited;
+      case 'ACCEPTED':
+        return EsusuInviteStatus.accepted;
+      case 'DECLINED':
+        return EsusuInviteStatus.declined;
+      case 'EXPIRED':
+        return EsusuInviteStatus.expired;
+      default:
+        return EsusuInviteStatus.invited;
+    }
+  }
+
+  String get displayName {
+    switch (this) {
+      case EsusuInviteStatus.invited:
+        return 'Invited';
+      case EsusuInviteStatus.accepted:
+        return 'Accepted';
+      case EsusuInviteStatus.declined:
+        return 'Declined';
+      case EsusuInviteStatus.expired:
+        return 'Expired';
+    }
+  }
+}
+
+/// Esusu List Response Model
+class EsusuListResponse {
+  final bool success;
+  final List<EsusuListItem> esusus;
+  final bool isAdmin;
+
+  EsusuListResponse({
+    required this.success,
+    required this.esusus,
+    required this.isAdmin,
+  });
+
+  factory EsusuListResponse.fromJson(Map<String, dynamic> json) {
+    final data = json['data'] as Map<String, dynamic>?;
+    final esususList = data?['esusus'] as List<dynamic>? ?? [];
+
+    return EsusuListResponse(
+      success: json['success'] ?? false,
+      esusus: esususList
+          .map((e) => EsusuListItem.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      isAdmin: data?['isAdmin'] ?? false,
+    );
+  }
 }

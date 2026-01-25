@@ -38,9 +38,10 @@ class _HubPageState extends ConsumerState<HubPage> {
   @override
   Widget build(BuildContext context) {
     final communityState = ref.watch(communityProvider);
-    final communityName = communityState.activeCommunity?.name ?? 'FinSquare Community';
-    // Member count - static for now, will be fetched from API later
-    const int memberCount = 1;
+    final activeCommunity = communityState.activeCommunity;
+    final communityName = activeCommunity?.name ?? 'FinSquare Community';
+    final memberCount = activeCommunity?.memberCount ?? 0;
+    final communityLogo = activeCommunity?.logo;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -82,7 +83,7 @@ class _HubPageState extends ConsumerState<HubPage> {
                           ),
                         ),
                         // Community header on top
-                        _buildCommunityHeader(communityName, memberCount),
+                        _buildCommunityHeader(communityName, memberCount, communityLogo),
                       ],
                     ),
                     const SizedBox(height: 24),
@@ -203,7 +204,7 @@ class _HubPageState extends ConsumerState<HubPage> {
   }
 
   /// Community header widget - matching old design
-  Widget _buildCommunityHeader(String communityName, int memberCount) {
+  Widget _buildCommunityHeader(String communityName, int memberCount, String? logoUrl) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10).copyWith(left: 8, right: 6),
       decoration: BoxDecoration(
@@ -213,35 +214,45 @@ class _HubPageState extends ConsumerState<HubPage> {
       ),
       child: Row(
         children: [
-          // Logo with colored stripes (gradient circle)
+          // Logo - show image if available, otherwise gradient circle with initial
           Container(
             width: 60,
             height: 60,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              gradient: LinearGradient(
-                colors: [
-                  Colors.red.shade400,
-                  Colors.blue.shade400,
-                  Colors.yellow.shade400,
-                  Colors.brown.shade400,
-                  Colors.lightBlue.shade400,
-                  Colors.blue.shade700,
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
+              gradient: logoUrl == null || logoUrl.isEmpty
+                  ? LinearGradient(
+                      colors: [
+                        Colors.red.shade400,
+                        Colors.blue.shade400,
+                        Colors.yellow.shade400,
+                        Colors.brown.shade400,
+                        Colors.lightBlue.shade400,
+                        Colors.blue.shade700,
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    )
+                  : null,
+              image: logoUrl != null && logoUrl.isNotEmpty
+                  ? DecorationImage(
+                      image: NetworkImage(logoUrl),
+                      fit: BoxFit.cover,
+                    )
+                  : null,
             ),
-            child: Center(
-              child: Text(
-                communityName.isNotEmpty ? communityName.substring(0, 1).toUpperCase() : 'F',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
+            child: logoUrl == null || logoUrl.isEmpty
+                ? Center(
+                    child: Text(
+                      communityName.isNotEmpty ? communityName.substring(0, 1).toUpperCase() : 'F',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  )
+                : null,
           ),
           const SizedBox(width: 16),
           Expanded(

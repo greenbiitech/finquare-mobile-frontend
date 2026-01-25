@@ -30,7 +30,7 @@ class _ConfigureEsusuPageState extends ConsumerState<ConfigureEsusuPage> {
   final currencyFormat = NumberFormat.currency(
     locale: 'en_NG',
     symbol: '\u20A6',
-    decimalDigits: 0,
+    decimalDigits: 2,
   );
 
   @override

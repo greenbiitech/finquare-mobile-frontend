@@ -530,6 +530,60 @@ class EsusuRepository {
     );
     return EsusuListResponse.fromJson(response.data);
   }
+
+  /// Get Esusu invitation details for a member
+  Future<EsusuInvitationDetails> getInvitationDetails(String esusuId) async {
+    final response = await _apiClient.get(
+      ApiEndpoints.esusuInvitationDetails(esusuId),
+    );
+    final data = response.data['data'] as Map<String, dynamic>?;
+    if (data == null) {
+      throw Exception('Invalid response data');
+    }
+    return EsusuInvitationDetails.fromJson(data);
+  }
+
+  /// Respond to Esusu invitation (accept or decline)
+  /// Returns [InvitationResponse] with esusu details if accepted
+  Future<InvitationResponse> respondToInvitation(String esusuId, {required bool accept}) async {
+    final response = await _apiClient.post(
+      ApiEndpoints.esusuRespondInvitation(esusuId),
+      data: {'accept': accept},
+    );
+    return InvitationResponse.fromJson(response.data, accept);
+  }
+
+  /// Get slot details for FCFS slot selection
+  Future<EsusuSlotDetails> getSlotDetails(String esusuId) async {
+    final response = await _apiClient.get(
+      ApiEndpoints.esusuSlotDetails(esusuId),
+    );
+    final data = response.data['data'] as Map<String, dynamic>?;
+    if (data == null) {
+      throw Exception('Invalid response data');
+    }
+    return EsusuSlotDetails.fromJson(data);
+  }
+
+  /// Select a slot for FCFS payout order
+  Future<void> selectSlot(String esusuId, {required int slotNumber}) async {
+    await _apiClient.post(
+      ApiEndpoints.esusuSelectSlot(esusuId),
+      data: {'slotNumber': slotNumber},
+    );
+  }
+
+  /// Get waiting room details (participants list, countdown, etc.)
+  Future<EsusuWaitingRoomDetails> getWaitingRoomDetails(String esusuId) async {
+    final response = await _apiClient.get(
+      ApiEndpoints.esusuWaitingRoom(esusuId),
+    );
+    final data = response.data['data'] as Map<String, dynamic>?;
+    if (data == null) {
+      throw Exception('Invalid response data');
+    }
+    return EsusuWaitingRoomDetails.fromJson(data);
+  }
 }
 
 // =====================================================
@@ -704,6 +758,259 @@ class EsusuListResponse {
           .map((e) => EsusuListItem.fromJson(e as Map<String, dynamic>))
           .toList(),
       isAdmin: data?['isAdmin'] ?? false,
+    );
+  }
+}
+
+// =====================================================
+// INVITATION DETAILS MODELS
+// =====================================================
+
+/// Payout Schedule Item Model
+class PayoutScheduleItem {
+  final int cycleNumber;
+  final DateTime payoutDate;
+  final String? recipientName;
+
+  PayoutScheduleItem({
+    required this.cycleNumber,
+    required this.payoutDate,
+    this.recipientName,
+  });
+
+  factory PayoutScheduleItem.fromJson(Map<String, dynamic> json) {
+    return PayoutScheduleItem(
+      cycleNumber: json['cycleNumber'] ?? 0,
+      payoutDate: DateTime.parse(json['payoutDate'] ?? DateTime.now().toIso8601String()),
+      recipientName: json['recipientName'],
+    );
+  }
+}
+
+/// Esusu Invitation Details Model
+class EsusuInvitationDetails {
+  final String id;
+  final String name;
+  final String? description;
+  final String? iconUrl;
+  final double contributionAmount;
+  final String frequency;
+  final int targetMembers;
+  final DateTime startDate;
+  final double totalAmountPerCycle;
+  final double commission;
+  final double platformFeePercent;
+  final double platformFee;
+  final double payout;
+  final List<PayoutScheduleItem> payoutSchedule;
+  final String creatorName;
+  final DateTime participationDeadline;
+
+  EsusuInvitationDetails({
+    required this.id,
+    required this.name,
+    this.description,
+    this.iconUrl,
+    required this.contributionAmount,
+    required this.frequency,
+    required this.targetMembers,
+    required this.startDate,
+    required this.totalAmountPerCycle,
+    required this.commission,
+    required this.platformFeePercent,
+    required this.platformFee,
+    required this.payout,
+    required this.payoutSchedule,
+    required this.creatorName,
+    required this.participationDeadline,
+  });
+
+  factory EsusuInvitationDetails.fromJson(Map<String, dynamic> json) {
+    final scheduleList = json['payoutSchedule'] as List<dynamic>? ?? [];
+
+    return EsusuInvitationDetails(
+      id: json['id'] ?? '',
+      name: json['name'] ?? '',
+      description: json['description'],
+      iconUrl: json['iconUrl'],
+      contributionAmount: (json['contributionAmount'] ?? 0).toDouble(),
+      frequency: json['frequency'] ?? 'Monthly',
+      targetMembers: json['targetMembers'] ?? 0,
+      startDate: DateTime.parse(json['startDate'] ?? DateTime.now().toIso8601String()),
+      totalAmountPerCycle: (json['totalAmountPerCycle'] ?? 0).toDouble(),
+      commission: (json['commission'] ?? 0).toDouble(),
+      platformFeePercent: (json['platformFeePercent'] ?? 1.5).toDouble(),
+      platformFee: (json['platformFee'] ?? 0).toDouble(),
+      payout: (json['payout'] ?? 0).toDouble(),
+      payoutSchedule: scheduleList
+          .map((s) => PayoutScheduleItem.fromJson(s as Map<String, dynamic>))
+          .toList(),
+      creatorName: json['creatorName'] ?? '',
+      participationDeadline: DateTime.parse(
+          json['participationDeadline'] ?? DateTime.now().toIso8601String()),
+    );
+  }
+}
+
+/// Response from accepting/declining an invitation
+class InvitationResponse {
+  final bool accepted;
+  final String? esusuId;
+  final String? esusuName;
+  final PayoutOrderType? payoutOrderType;
+
+  InvitationResponse({
+    required this.accepted,
+    this.esusuId,
+    this.esusuName,
+    this.payoutOrderType,
+  });
+
+  factory InvitationResponse.fromJson(Map<String, dynamic> json, bool accepted) {
+    final data = json['data'] as Map<String, dynamic>?;
+
+    if (!accepted || data == null) {
+      return InvitationResponse(accepted: accepted);
+    }
+
+    return InvitationResponse(
+      accepted: accepted,
+      esusuId: data['esusuId'],
+      esusuName: data['esusuName'],
+      payoutOrderType: data['payoutOrderType'] != null
+          ? PayoutOrderType.fromString(data['payoutOrderType'])
+          : null,
+    );
+  }
+
+  /// Whether the user needs to select a slot (FCFS payout order)
+  bool get needsSlotSelection =>
+      accepted && payoutOrderType == PayoutOrderType.firstComeFirstServed;
+}
+
+/// Model for slot selection page
+class EsusuSlotDetails {
+  final String id;
+  final String name;
+  final String? description;
+  final String? iconUrl;
+  final double contributionAmount;
+  final String frequency;
+  final int targetMembers;
+  final DateTime startDate;
+  final List<int> availableSlots;
+  final List<int> takenSlots;
+
+  EsusuSlotDetails({
+    required this.id,
+    required this.name,
+    this.description,
+    this.iconUrl,
+    required this.contributionAmount,
+    required this.frequency,
+    required this.targetMembers,
+    required this.startDate,
+    required this.availableSlots,
+    required this.takenSlots,
+  });
+
+  factory EsusuSlotDetails.fromJson(Map<String, dynamic> json) {
+    final availableList = json['availableSlots'] as List<dynamic>? ?? [];
+    final takenList = json['takenSlots'] as List<dynamic>? ?? [];
+
+    return EsusuSlotDetails(
+      id: json['id'] ?? '',
+      name: json['name'] ?? '',
+      description: json['description'],
+      iconUrl: json['iconUrl'],
+      contributionAmount: (json['contributionAmount'] ?? 0).toDouble(),
+      frequency: json['frequency'] ?? 'Monthly',
+      targetMembers: json['targetMembers'] ?? 0,
+      startDate: DateTime.parse(json['startDate'] ?? DateTime.now().toIso8601String()),
+      availableSlots: availableList.map((e) => e as int).toList(),
+      takenSlots: takenList.map((e) => e as int).toList(),
+    );
+  }
+}
+
+/// Model for waiting room participant
+class WaitingRoomParticipant {
+  final String id;
+  final String fullName;
+  final String email;
+  final String? profileImage;
+  final String inviteStatus;
+  final int? slotNumber;
+  final bool isCreator;
+
+  WaitingRoomParticipant({
+    required this.id,
+    required this.fullName,
+    required this.email,
+    this.profileImage,
+    required this.inviteStatus,
+    this.slotNumber,
+    required this.isCreator,
+  });
+
+  factory WaitingRoomParticipant.fromJson(Map<String, dynamic> json) {
+    return WaitingRoomParticipant(
+      id: json['id'] ?? '',
+      fullName: json['fullName'] ?? '',
+      email: json['email'] ?? '',
+      profileImage: json['profileImage'],
+      inviteStatus: json['inviteStatus'] ?? 'INVITED',
+      slotNumber: json['slotNumber'],
+      isCreator: json['isCreator'] ?? false,
+    );
+  }
+}
+
+/// Model for waiting room details
+class EsusuWaitingRoomDetails {
+  final String id;
+  final String name;
+  final String? description;
+  final String? iconUrl;
+  final double contributionAmount;
+  final String frequency;
+  final int targetMembers;
+  final DateTime startDate;
+  final String status;
+  final String payoutOrderType;
+  final List<WaitingRoomParticipant> participants;
+
+  EsusuWaitingRoomDetails({
+    required this.id,
+    required this.name,
+    this.description,
+    this.iconUrl,
+    required this.contributionAmount,
+    required this.frequency,
+    required this.targetMembers,
+    required this.startDate,
+    required this.status,
+    required this.payoutOrderType,
+    required this.participants,
+  });
+
+  factory EsusuWaitingRoomDetails.fromJson(Map<String, dynamic> json) {
+    final participantsList = json['participants'] as List<dynamic>? ?? [];
+
+    return EsusuWaitingRoomDetails(
+      id: json['id'] ?? '',
+      name: json['name'] ?? '',
+      description: json['description'],
+      iconUrl: json['iconUrl'],
+      contributionAmount: (json['contributionAmount'] ?? 0).toDouble(),
+      frequency: json['frequency'] ?? 'Monthly',
+      targetMembers: json['targetMembers'] ?? 0,
+      startDate: DateTime.parse(json['startDate'] ?? DateTime.now().toIso8601String()),
+      status: json['status'] ?? 'PENDING_MEMBERS',
+      payoutOrderType: json['payoutOrderType'] ?? 'RANDOM',
+      participants: participantsList
+          .map((p) => WaitingRoomParticipant.fromJson(p as Map<String, dynamic>))
+          .toList(),
     );
   }
 }

@@ -161,4 +161,21 @@ class ApiEndpoints {
   /// Get Esusu list: /esusu/list/{communityId}
   static String esusuList(String communityId) =>
       '/esusu/list/$communityId';
+
+  /// Get Esusu invitation details: /esusu/{esusuId}/invitation
+  static String esusuInvitationDetails(String esusuId) =>
+      '/esusu/$esusuId/invitation';
+
+  /// Respond to Esusu invitation: /esusu/{esusuId}/respond
+  static String esusuRespondInvitation(String esusuId) =>
+      '/esusu/$esusuId/respond';
+
+  /// Get slot details for FCFS: /esusu/{esusuId}/slots
+  static String esusuSlotDetails(String esusuId) => '/esusu/$esusuId/slots';
+
+  /// Select a slot for FCFS: /esusu/{esusuId}/select-slot
+  static String esusuSelectSlot(String esusuId) => '/esusu/$esusuId/select-slot';
+
+  /// Get waiting room details: /esusu/{esusuId}/waiting-room
+  static String esusuWaitingRoom(String esusuId) => '/esusu/$esusuId/waiting-room';
 }

@@ -62,6 +62,9 @@ import 'package:finsquare_mobile_app/features/esusu/presentation/pages/esusu_suc
 import 'package:finsquare_mobile_app/features/esusu/presentation/pages/esusu_list_page.dart';
 import 'package:finsquare_mobile_app/features/esusu/presentation/pages/esusu_detail_page.dart';
 import 'package:finsquare_mobile_app/features/esusu/presentation/pages/active_esusu_detail_page.dart';
+import 'package:finsquare_mobile_app/features/esusu/presentation/pages/esusu_invitation_page.dart';
+import 'package:finsquare_mobile_app/features/esusu/presentation/pages/slot_selection_page.dart';
+import 'package:finsquare_mobile_app/features/esusu/presentation/pages/esusu_waiting_room_page.dart';
 
 part 'app_router.g.dart';
 
@@ -125,6 +128,9 @@ abstract class AppRoutes {
   static const String esusuList = '/esusu-list';
   static const String esusuDetail = '/esusu-detail';
   static const String activeEsusuDetail = '/active-esusu-detail';
+  static const String esusuInvitation = '/esusu-invitation';
+  static const String esusuSlotSelection = '/esusu-slot-selection';
+  static const String esusuWaitingRoom = '/esusu-waiting-room';
   static const String esusuWelcome = '/esusu-welcome';
   static const String createEsusu = '/create-esusu';
   static const String configureEsusu = '/configure-esusu';
@@ -520,6 +526,33 @@ GoRouter appRouter(Ref ref) {
           final esusuId = state.pathParameters['esusuId'] ?? '';
           final esusuName = state.uri.queryParameters['name'] ?? 'Esusu';
           return ActiveEsusuDetailPage(esusuId: esusuId, esusuName: esusuName);
+        },
+      ),
+      GoRoute(
+        path: '${AppRoutes.esusuInvitation}/:esusuId',
+        name: 'esusuInvitation',
+        builder: (context, state) {
+          final esusuId = state.pathParameters['esusuId'] ?? '';
+          final esusuName = state.uri.queryParameters['name'] ?? 'Esusu';
+          return EsusuInvitationPage(esusuId: esusuId, esusuName: esusuName);
+        },
+      ),
+      GoRoute(
+        path: '${AppRoutes.esusuSlotSelection}/:esusuId',
+        name: 'esusuSlotSelection',
+        builder: (context, state) {
+          final esusuId = state.pathParameters['esusuId'] ?? '';
+          final esusuName = state.uri.queryParameters['name'] ?? 'Esusu';
+          return SlotSelectionPage(esusuId: esusuId, esusuName: esusuName);
+        },
+      ),
+      GoRoute(
+        path: '${AppRoutes.esusuWaitingRoom}/:esusuId',
+        name: 'esusuWaitingRoom',
+        builder: (context, state) {
+          final esusuId = state.pathParameters['esusuId'] ?? '';
+          final esusuName = state.uri.queryParameters['name'] ?? 'Esusu';
+          return EsusuWaitingRoomPage(esusuId: esusuId, esusuName: esusuName);
         },
       ),
       GoRoute(

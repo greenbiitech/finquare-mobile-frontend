@@ -150,7 +150,7 @@ class _ConfigureEsusuPageState extends ConsumerState<ConfigureEsusuPage> {
 
     final schedule = <Map<String, String>>[];
     var currentDate = state.collectionDate!;
-    final dateFormat = DateFormat('MMM yyyy');
+    final dateFormat = DateFormat('MMM d, yyyy');
 
     for (int i = 1; i <= state.numberOfParticipants!; i++) {
       schedule.add({

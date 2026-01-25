@@ -6,6 +6,7 @@ import 'package:shimmer/shimmer.dart';
 import 'package:finsquare_mobile_app/config/theme/app_theme.dart';
 import 'package:finsquare_mobile_app/config/routes/app_router.dart';
 import 'package:finsquare_mobile_app/features/community/presentation/providers/community_provider.dart';
+import 'package:finsquare_mobile_app/features/esusu/data/esusu_repository.dart';
 
 // Colors matching old Greencard codebase
 const Color _greyBackground = Color(0xFFF3F3F3);
@@ -34,6 +35,43 @@ class HubPage extends ConsumerStatefulWidget {
 
 class _HubPageState extends ConsumerState<HubPage> {
   final bool _isLoading = false;
+  int _esusuCount = 0;
+  String? _lastCommunityId;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _fetchEsusuCount();
+    });
+  }
+
+  Future<void> _fetchEsusuCount() async {
+    final communityState = ref.read(communityProvider);
+    final communityId = communityState.activeCommunity?.id;
+
+    if (communityId == null || communityState.activeCommunity?.isDefault == true) {
+      setState(() => _esusuCount = 0);
+      return;
+    }
+
+    // Avoid re-fetching if community hasn't changed
+    if (communityId == _lastCommunityId) return;
+    _lastCommunityId = communityId;
+
+    try {
+      final repository = ref.read(esusuRepositoryProvider);
+      final response = await repository.getHubCount(communityId);
+      if (mounted) {
+        setState(() => _esusuCount = response.total);
+      }
+    } catch (e) {
+      // Silently fail - keep count at 0
+      if (mounted) {
+        setState(() => _esusuCount = 0);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -42,6 +80,13 @@ class _HubPageState extends ConsumerState<HubPage> {
     final communityName = activeCommunity?.name ?? 'FinSquare Community';
     final memberCount = activeCommunity?.memberCount ?? 0;
     final communityLogo = activeCommunity?.logo;
+
+    // Re-fetch Esusu count when community changes
+    if (activeCommunity?.id != _lastCommunityId) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _fetchEsusuCount();
+      });
+    }
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -363,7 +408,7 @@ class _HubPageState extends ConsumerState<HubPage> {
           crossAxisSpacing: 12,
           mainAxisSpacing: 12,
           children: [
-            _buildFinanceItem('Esusu', 'assets/svgs/hub/esusu.svg', 0, _esusuBgColor, _esusuTextColor, onTap: () => context.push(AppRoutes.esusuList)),
+            _buildFinanceItem('Esusu', 'assets/svgs/hub/esusu.svg', _esusuCount, _esusuBgColor, _esusuTextColor, onTap: () => context.push(AppRoutes.esusuList)),
             _buildFinanceItem('Dues', 'assets/svgs/hub/dues.svg', 0, _duesBgColor, _duesTextColor),
             _buildFinanceItem('Contributions', 'assets/svgs/hub/contributions.svg', 0, _contributionsBgColor, _contributionsTextColor),
             _buildFinanceItem('Group Buying', 'assets/svgs/hub/group_buying.svg', 0, _groupBuyBgColor, _groupBuyTextColor),

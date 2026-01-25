@@ -232,39 +232,52 @@ class _CreateEsusuPageState extends ConsumerState<CreateEsusuPage> {
                       // Icon/Picture picker
                       GestureDetector(
                         onTap: _pickImage,
-                        child: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(vertical: 30),
-                          decoration: BoxDecoration(
-                            color: _esusuLightPurple,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: state.iconPath != null
-                              ? Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: Image.file(
-                                        File(state.iconPath!),
-                                        width: 80,
-                                        height: 80,
-                                        fit: BoxFit.cover,
-                                      ),
+                        child: state.iconPath != null
+                            ? Stack(
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Image.file(
+                                      File(state.iconPath!),
+                                      width: double.infinity,
+                                      height: 180,
+                                      fit: BoxFit.cover,
                                     ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'Tap to change',
-                                      style: TextStyle(
-                                        fontFamily: AppTextStyles.fontFamily,
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w500,
+                                  ),
+                                  Positioned(
+                                    top: 8,
+                                    right: 8,
+                                    child: Container(
+                                      width: 32,
+                                      height: 32,
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(16),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withValues(alpha: 0.1),
+                                            blurRadius: 4,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
+                                      child: const Icon(
+                                        Icons.edit,
+                                        size: 18,
                                         color: _esusuPurple,
                                       ),
                                     ),
-                                  ],
-                                )
-                              : Column(
+                                  ),
+                                ],
+                              )
+                            : Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(vertical: 30),
+                                decoration: BoxDecoration(
+                                  color: _esusuLightPurple,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     SvgPicture.asset(
@@ -283,7 +296,7 @@ class _CreateEsusuPageState extends ConsumerState<CreateEsusuPage> {
                                     ),
                                   ],
                                 ),
-                        ),
+                              ),
                       ),
                       const SizedBox(height: 25),
 

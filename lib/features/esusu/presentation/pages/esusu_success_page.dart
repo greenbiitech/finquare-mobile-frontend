@@ -6,6 +6,7 @@ import 'package:finsquare_mobile_app/config/theme/app_theme.dart';
 import 'package:finsquare_mobile_app/config/routes/app_router.dart';
 import 'package:finsquare_mobile_app/core/widgets/default_button.dart';
 import 'package:finsquare_mobile_app/features/esusu/presentation/providers/esusu_creation_provider.dart';
+import 'package:finsquare_mobile_app/features/esusu/data/esusu_repository.dart';
 
 const Color _esusuPrimaryColor = Color(0xFF8B20E9);
 
@@ -58,6 +59,8 @@ class _EsusuSuccessPageState extends ConsumerState<EsusuSuccessPage> {
   void _navigateToHub() {
     // Reset the esusu creation state
     ref.read(esusuCreationProvider.notifier).reset();
+    // Trigger Hub refresh so it shows updated Esusu count
+    ref.read(hubRefreshTriggerProvider.notifier).state++;
     // Navigate to dashboard with Hub tab selected (index 2)
     context.go(AppRoutes.dashboard, extra: 2);
   }

@@ -7,6 +7,14 @@ final esusuRepositoryProvider = Provider<EsusuRepository>((ref) {
   return EsusuRepository(ref.watch(apiClientProvider));
 });
 
+/// Refresh trigger for Esusu List
+/// Increment this to force EsusuListPage to refresh its data
+final esusuListRefreshTriggerProvider = StateProvider<int>((ref) => 0);
+
+/// Refresh trigger for Hub Page
+/// Increment this to force HubPage to refresh its data (e.g., after creating Esusu)
+final hubRefreshTriggerProvider = StateProvider<int>((ref) => 0);
+
 // =====================================================
 // ENUMS
 // =====================================================
@@ -236,6 +244,7 @@ class EsusuCommunityMember {
   final String? photo;
   final String role;
   final bool isAdmin;
+  final bool isCurrentUser;
 
   EsusuCommunityMember({
     required this.id,
@@ -246,6 +255,7 @@ class EsusuCommunityMember {
     this.photo,
     required this.role,
     required this.isAdmin,
+    this.isCurrentUser = false,
   });
 
   factory EsusuCommunityMember.fromJson(Map<String, dynamic> json) {
@@ -258,6 +268,7 @@ class EsusuCommunityMember {
       photo: json['photo'],
       role: json['role'] ?? 'MEMBER',
       isAdmin: json['isAdmin'] ?? false,
+      isCurrentUser: json['isCurrentUser'] ?? false,
     );
   }
 }
@@ -636,6 +647,7 @@ class EsusuListItem {
   final String? iconUrl;
   final double contributionAmount;
   final PaymentFrequency frequency;
+  final PayoutOrderType payoutOrderType;
   final int numberOfParticipants;
   final int currentCycle;
   final int totalCycles;
@@ -647,6 +659,8 @@ class EsusuListItem {
   final DateTime participationDeadline;
   final bool isCreator;
   final String creatorName;
+  // Admin-specific fields for navigation
+  final bool isParticipant;
 
   EsusuListItem({
     required this.id,
@@ -657,6 +671,7 @@ class EsusuListItem {
     this.iconUrl,
     required this.contributionAmount,
     required this.frequency,
+    required this.payoutOrderType,
     required this.numberOfParticipants,
     required this.currentCycle,
     required this.totalCycles,
@@ -668,6 +683,7 @@ class EsusuListItem {
     required this.participationDeadline,
     required this.isCreator,
     required this.creatorName,
+    this.isParticipant = true,
   });
 
   factory EsusuListItem.fromJson(Map<String, dynamic> json) {
@@ -682,6 +698,7 @@ class EsusuListItem {
       iconUrl: json['iconUrl'],
       contributionAmount: (json['contributionAmount'] ?? 0).toDouble(),
       frequency: PaymentFrequency.fromString(json['frequency'] ?? 'MONTHLY'),
+      payoutOrderType: PayoutOrderType.fromString(json['payoutOrderType'] ?? 'RANDOM'),
       numberOfParticipants: json['numberOfParticipants'] ?? 0,
       currentCycle: json['currentCycle'] ?? 0,
       totalCycles: json['totalCycles'] ?? 0,
@@ -696,6 +713,7 @@ class EsusuListItem {
           json['participationDeadline'] ?? DateTime.now().toIso8601String()),
       isCreator: json['isCreator'] ?? false,
       creatorName: json['creatorName'] ?? '',
+      isParticipant: json['isParticipant'] ?? true,
     );
   }
 }

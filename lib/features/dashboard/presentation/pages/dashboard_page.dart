@@ -35,11 +35,11 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     _currentIndex = widget.initialIndex;
   }
 
-  List<Widget> _buildPages(bool hasWallet) {
+  List<Widget> _buildPages(bool hasWallet, int currentIndex) {
     return [
       HomePage(onNavigateToWallet: _navigateToWalletTab),
       const ShopPage(),
-      const HubPage(),
+      HubPage(isVisible: currentIndex == 2),
       hasWallet ? const WalletPage() : const ActivateWalletPage(),
       const OptionsPage(),
     ];
@@ -49,7 +49,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
     final hasWallet = authState.user?.hasWallet ?? false;
-    final pages = _buildPages(hasWallet);
+    final pages = _buildPages(hasWallet, _currentIndex);
 
     return Scaffold(
       backgroundColor: Colors.white,

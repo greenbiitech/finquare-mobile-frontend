@@ -14,11 +14,13 @@ const Color _esusuPrimaryColor = Color(0xFF8B20E9);
 class SlotSelectionPage extends ConsumerStatefulWidget {
   final String esusuId;
   final String esusuName;
+  final bool isAdmin;
 
   const SlotSelectionPage({
     super.key,
     required this.esusuId,
     required this.esusuName,
+    this.isAdmin = false,
   });
 
   @override
@@ -71,16 +73,28 @@ class _SlotSelectionPageState extends ConsumerState<SlotSelectionPage> {
       await repository.selectSlot(widget.esusuId, slotNumber: _selectedSlot!);
 
       if (mounted) {
+        // Trigger list refresh for when user returns to list
+        ref.read(esusuListRefreshTriggerProvider.notifier).state++;
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Slot $_selectedSlot selected successfully!'),
             backgroundColor: Colors.green,
           ),
         );
-        // Navigate to waiting room
-        context.pushReplacement(
-          '${AppRoutes.esusuWaitingRoom}/${widget.esusuId}?name=${Uri.encodeComponent(widget.esusuName)}',
-        );
+
+        // Navigate to appropriate waiting room based on user role
+        if (widget.isAdmin) {
+          // Admin goes to Admin Waiting Room (esusu_detail_page)
+          context.pushReplacement(
+            '${AppRoutes.esusuDetail}/${widget.esusuId}?name=${Uri.encodeComponent(widget.esusuName)}',
+          );
+        } else {
+          // Member goes to Member Waiting Room
+          context.pushReplacement(
+            '${AppRoutes.esusuWaitingRoom}/${widget.esusuId}?name=${Uri.encodeComponent(widget.esusuName)}',
+          );
+        }
       }
     } catch (e) {
       if (mounted) {

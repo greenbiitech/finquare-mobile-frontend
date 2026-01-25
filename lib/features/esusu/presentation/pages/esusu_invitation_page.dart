@@ -119,6 +119,9 @@ class _EsusuInvitationPageState extends ConsumerState<EsusuInvitationPage> {
       final response = await repository.respondToInvitation(widget.esusuId, accept: true);
 
       if (mounted) {
+        // Trigger list refresh for when user returns to list
+        ref.read(esusuListRefreshTriggerProvider.notifier).state++;
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Invitation accepted successfully!'),
@@ -204,6 +207,9 @@ class _EsusuInvitationPageState extends ConsumerState<EsusuInvitationPage> {
       await repository.respondToInvitation(widget.esusuId, accept: false);
 
       if (mounted) {
+        // Trigger list refresh for when user returns to list
+        ref.read(esusuListRefreshTriggerProvider.notifier).state++;
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Invitation declined'),

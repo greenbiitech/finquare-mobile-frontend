@@ -27,7 +27,9 @@ const Color _groupBuyTextColor = Color(0xFFFC9D37);
 /// Hub Page - Static UI matching old Greencard design
 /// Logic to be added later
 class HubPage extends ConsumerStatefulWidget {
-  const HubPage({super.key});
+  final bool isVisible;
+
+  const HubPage({super.key, this.isVisible = true});
 
   @override
   ConsumerState<HubPage> createState() => _HubPageState();
@@ -37,13 +39,32 @@ class _HubPageState extends ConsumerState<HubPage> {
   final bool _isLoading = false;
   int _esusuCount = 0;
   String? _lastCommunityId;
+  int _lastRefreshTrigger = 0;
+  bool _wasVisible = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _lastRefreshTrigger = ref.read(hubRefreshTriggerProvider);
       _fetchEsusuCount();
     });
+  }
+
+  @override
+  void didUpdateWidget(covariant HubPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Refresh when tab becomes visible (was not visible, now visible)
+    if (widget.isVisible && !_wasVisible) {
+      _forceRefresh();
+    }
+    _wasVisible = widget.isVisible;
+  }
+
+  /// Force refresh by clearing cached community ID
+  void _forceRefresh() {
+    _lastCommunityId = null;
+    _fetchEsusuCount();
   }
 
   Future<void> _fetchEsusuCount() async {
@@ -55,7 +76,7 @@ class _HubPageState extends ConsumerState<HubPage> {
       return;
     }
 
-    // Avoid re-fetching if community hasn't changed
+    // Avoid re-fetching if community hasn't changed (unless forced)
     if (communityId == _lastCommunityId) return;
     _lastCommunityId = communityId;
 
@@ -75,6 +96,14 @@ class _HubPageState extends ConsumerState<HubPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Listen for refresh trigger changes (e.g., after creating a new Esusu)
+    ref.listen<int>(hubRefreshTriggerProvider, (previous, next) {
+      if (next != _lastRefreshTrigger) {
+        _lastRefreshTrigger = next;
+        _forceRefresh();
+      }
+    });
+
     final communityState = ref.watch(communityProvider);
     final activeCommunity = communityState.activeCommunity;
     final communityName = activeCommunity?.name ?? 'FinSquare Community';

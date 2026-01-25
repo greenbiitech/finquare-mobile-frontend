@@ -543,7 +543,8 @@ GoRouter appRouter(Ref ref) {
         builder: (context, state) {
           final esusuId = state.pathParameters['esusuId'] ?? '';
           final esusuName = state.uri.queryParameters['name'] ?? 'Esusu';
-          return SlotSelectionPage(esusuId: esusuId, esusuName: esusuName);
+          final isAdmin = state.uri.queryParameters['isAdmin'] == 'true';
+          return SlotSelectionPage(esusuId: esusuId, esusuName: esusuName, isAdmin: isAdmin);
         },
       ),
       GoRoute(

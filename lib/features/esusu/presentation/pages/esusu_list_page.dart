@@ -27,11 +27,13 @@ class _EsusuListPageState extends ConsumerState<EsusuListPage> {
   List<EsusuListItem> _activeEsusus = [];
   List<EsusuListItem> _archivedEsusus = [];
   bool _isAdmin = false;
+  int _lastRefreshTrigger = 0;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _lastRefreshTrigger = ref.read(esusuListRefreshTriggerProvider);
       _fetchEsusus();
     });
   }
@@ -82,6 +84,14 @@ class _EsusuListPageState extends ConsumerState<EsusuListPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Listen for refresh trigger changes (from other screens like Invitation, Slot Selection)
+    ref.listen<int>(esusuListRefreshTriggerProvider, (previous, next) {
+      if (next != _lastRefreshTrigger) {
+        _lastRefreshTrigger = next;
+        _fetchEsusus();
+      }
+    });
+
     final currentList = _selectedTabIndex == 0 ? _activeEsusus : _archivedEsusus;
 
     return Scaffold(
@@ -493,21 +503,59 @@ class _EsusuListPageState extends ConsumerState<EsusuListPage> {
     if (!_isAdmin && item.inviteStatus == EsusuInviteStatus.invited) {
       context.push(
         '${AppRoutes.esusuInvitation}/${item.id}?name=${Uri.encodeComponent(item.name)}',
-      );
+      ).then((_) => _fetchEsusus()); // Refresh list on return
       return;
     }
 
-    // Admin view or accepted member
-    if (item.status == EsusuStatus.pendingMembers) {
-      // Navigate to pending members detail page
+    // If member has accepted and Esusu is pending/ready, show waiting room
+    if (!_isAdmin &&
+        item.inviteStatus == EsusuInviteStatus.accepted &&
+        (item.status == EsusuStatus.pendingMembers ||
+            item.status == EsusuStatus.readyToStart)) {
       context.push(
-        '${AppRoutes.esusuDetail}/${item.id}?name=${Uri.encodeComponent(item.name)}',
-      );
-    } else if (item.status == EsusuStatus.active) {
+        '${AppRoutes.esusuWaitingRoom}/${item.id}?name=${Uri.encodeComponent(item.name)}',
+      ).then((_) => _fetchEsusus()); // Refresh list on return
+      return;
+    }
+
+    // Admin view for pending/ready Esusus
+    if (_isAdmin &&
+        (item.status == EsusuStatus.pendingMembers ||
+            item.status == EsusuStatus.readyToStart)) {
+      // Check if Admin is a participant and needs to select a slot (FCFS)
+      final needsSlotSelection = item.isParticipant &&
+          item.payoutOrderType == PayoutOrderType.firstComeFirstServed &&
+          item.slotNumber == null;
+
+      // Debug logging
+      debugPrint('=== Admin Card Tap Debug ===');
+      debugPrint('Esusu: ${item.name}');
+      debugPrint('isParticipant: ${item.isParticipant}');
+      debugPrint('payoutOrderType: ${item.payoutOrderType}');
+      debugPrint('slotNumber: ${item.slotNumber}');
+      debugPrint('needsSlotSelection: $needsSlotSelection');
+      debugPrint('============================');
+
+      if (needsSlotSelection) {
+        // Admin needs to pick a slot first, then go to Admin Waiting Room
+        context.push(
+          '${AppRoutes.esusuSlotSelection}/${item.id}?name=${Uri.encodeComponent(item.name)}&isAdmin=true',
+        ).then((_) => _fetchEsusus());
+      } else {
+        // Admin goes directly to Admin Waiting Room (esusu_detail_page)
+        context.push(
+          '${AppRoutes.esusuDetail}/${item.id}?name=${Uri.encodeComponent(item.name)}',
+        ).then((_) => _fetchEsusus());
+      }
+      return;
+    }
+
+    // Active esusu
+    if (item.status == EsusuStatus.active) {
       // Navigate to active esusu detail page
       context.push(
         '${AppRoutes.activeEsusuDetail}/${item.id}?name=${Uri.encodeComponent(item.name)}',
-      );
+      ).then((_) => _fetchEsusus()); // Refresh list on return
     }
   }
 

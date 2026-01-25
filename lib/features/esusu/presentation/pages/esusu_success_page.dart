@@ -1,20 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_confetti/flutter_confetti.dart';
 import 'package:finsquare_mobile_app/config/theme/app_theme.dart';
 import 'package:finsquare_mobile_app/config/routes/app_router.dart';
 import 'package:finsquare_mobile_app/core/widgets/default_button.dart';
+import 'package:finsquare_mobile_app/features/esusu/presentation/providers/esusu_creation_provider.dart';
 
 const Color _esusuPrimaryColor = Color(0xFF8B20E9);
 
-class EsusuSuccessPage extends StatefulWidget {
+class EsusuSuccessPage extends ConsumerStatefulWidget {
   const EsusuSuccessPage({super.key});
 
   @override
-  State<EsusuSuccessPage> createState() => _EsusuSuccessPageState();
+  ConsumerState<EsusuSuccessPage> createState() => _EsusuSuccessPageState();
 }
 
-class _EsusuSuccessPageState extends State<EsusuSuccessPage> {
+class _EsusuSuccessPageState extends ConsumerState<EsusuSuccessPage> {
   bool _confettiLaunched = false;
 
   @override
@@ -53,55 +55,63 @@ class _EsusuSuccessPageState extends State<EsusuSuccessPage> {
     }
   }
 
+  void _navigateToHub() {
+    // Reset the esusu creation state
+    ref.read(esusuCreationProvider.notifier).reset();
+    // Navigate to dashboard with Hub tab selected (index 2)
+    context.go(AppRoutes.dashboard, extra: 2);
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20.0),
-          child: Column(
-            children: [
-              const Spacer(),
-              // Success Icon with multiple circles
-              _buildSuccessIcon(),
-              const SizedBox(height: 40),
-              // Success Title
-              Text(
-                'Invites sent',
-                style: TextStyle(
-                  fontFamily: AppTextStyles.fontFamily,
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.black,
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20.0),
+            child: Column(
+              children: [
+                const Spacer(),
+                // Success Icon with multiple circles
+                _buildSuccessIcon(),
+                const SizedBox(height: 40),
+                // Success Title
+                Text(
+                  'Invites sent',
+                  style: TextStyle(
+                    fontFamily: AppTextStyles.fontFamily,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black,
+                  ),
+                  textAlign: TextAlign.center,
                 ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
-              // Success Description
-              Text(
-                'Invites have been sent and savings will start once all members accept',
-                style: TextStyle(
-                  fontFamily: AppTextStyles.fontFamily,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w400,
-                  color: Color(0xFF606060),
+                const SizedBox(height: 16),
+                // Success Description
+                Text(
+                  'Invites have been sent and savings will start once all members accept',
+                  style: TextStyle(
+                    fontFamily: AppTextStyles.fontFamily,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w400,
+                    color: Color(0xFF606060),
+                  ),
+                  textAlign: TextAlign.center,
                 ),
-                textAlign: TextAlign.center,
-              ),
-              const Spacer(),
-              // View Esusu Button
-              DefaultButton(
-                isButtonEnabled: true,
-                onPressed: () {
-                  context.go(AppRoutes.dashboard);
-                },
-                title: 'view Esusu',
-                buttonColor: _esusuPrimaryColor,
-                height: 54,
-              ),
-              const SizedBox(height: 30),
-            ],
+                const Spacer(),
+                // View Esusu Button
+                DefaultButton(
+                  isButtonEnabled: true,
+                  onPressed: _navigateToHub,
+                  title: 'View Esusu',
+                  buttonColor: _esusuPrimaryColor,
+                  height: 54,
+                ),
+                const SizedBox(height: 30),
+              ],
+            ),
           ),
         ),
       ),

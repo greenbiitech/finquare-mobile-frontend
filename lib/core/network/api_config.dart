@@ -138,4 +138,19 @@ class ApiEndpoints {
   // Withdrawal Account
   static const String withdrawalAccount = '/withdrawals/account';
   static const String withdrawalAccountMe = '/withdrawals/account/me';
+
+  // Esusu
+  static const String esusu = '/esusu';
+
+  /// Check Esusu creation eligibility: /esusu/{communityId}/eligibility
+  static String esusuEligibility(String communityId) =>
+      '/esusu/$communityId/eligibility';
+
+  /// Check Esusu name availability: /esusu/check-name/{communityId}/{name}
+  static String esusuCheckName(String communityId, String name) =>
+      '/esusu/check-name/$communityId/$name';
+
+  /// Get community members for Esusu participant selection: /esusu/{communityId}/members
+  static String esusuCommunityMembers(String communityId) =>
+      '/esusu/$communityId/members';
 }

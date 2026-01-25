@@ -81,14 +81,16 @@ class CommunityWalletNotifier extends StateNotifier<CommunityWalletState> {
   /// Create community wallet
   Future<bool> createWallet({
     required String communityId,
-    required List<String> signatoryIds,
+    required String signatoryBUserId,
+    required String signatoryCUserId,
     required String approvalRule,
     required String transactionPin,
   }) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
       final request = CreateCommunityWalletRequest(
-        signatoryIds: signatoryIds,
+        signatoryBUserId: signatoryBUserId,
+        signatoryCUserId: signatoryCUserId,
         approvalRule: approvalRule,
         transactionPin: transactionPin,
       );

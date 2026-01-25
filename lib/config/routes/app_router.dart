@@ -54,6 +54,7 @@ import 'package:finsquare_mobile_app/features/community/presentation/pages/manag
 import 'package:finsquare_mobile_app/features/community/presentation/pages/members_page.dart';
 import 'package:finsquare_mobile_app/features/wallet/presentation/pages/community_wallet_setup_page.dart';
 import 'package:finsquare_mobile_app/features/esusu/presentation/pages/esusu_welcome_page.dart';
+import 'package:finsquare_mobile_app/features/esusu/presentation/pages/create_esusu_page.dart';
 import 'package:finsquare_mobile_app/features/esusu/presentation/pages/configure_esusu_page.dart';
 import 'package:finsquare_mobile_app/features/esusu/presentation/pages/add_participants_page.dart';
 import 'package:finsquare_mobile_app/features/esusu/presentation/pages/select_payout_order_page.dart';
@@ -125,6 +126,7 @@ abstract class AppRoutes {
   static const String esusuDetail = '/esusu-detail';
   static const String activeEsusuDetail = '/active-esusu-detail';
   static const String esusuWelcome = '/esusu-welcome';
+  static const String createEsusu = '/create-esusu';
   static const String configureEsusu = '/configure-esusu';
   static const String addParticipants = '/add-participants';
   static const String selectPayoutOrder = '/select-payout-order';
@@ -524,6 +526,11 @@ GoRouter appRouter(Ref ref) {
         path: AppRoutes.esusuWelcome,
         name: 'esusuWelcome',
         builder: (context, state) => const EsusuWelcomePage(),
+      ),
+      GoRoute(
+        path: AppRoutes.createEsusu,
+        name: 'createEsusu',
+        builder: (context, state) => const CreateEsusuPage(),
       ),
       GoRoute(
         path: AppRoutes.configureEsusu,

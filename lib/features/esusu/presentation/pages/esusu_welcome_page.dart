@@ -1,21 +1,259 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:finsquare_mobile_app/config/routes/app_router.dart';
 import 'package:finsquare_mobile_app/config/theme/app_theme.dart';
 import 'package:finsquare_mobile_app/core/widgets/back_button.dart';
 import 'package:finsquare_mobile_app/core/widgets/default_button.dart';
+import 'package:finsquare_mobile_app/features/community/presentation/providers/community_provider.dart';
+import 'package:finsquare_mobile_app/features/esusu/data/esusu_repository.dart';
+import 'package:finsquare_mobile_app/features/esusu/presentation/providers/esusu_creation_provider.dart';
 
 // Esusu primary colors
 const Color _esusuPrimaryColor = Color(0xFF8B20E9);
-const Color _esusuLightColor = Color(0xFFEBDAFB);
 const Color _mainTextColor = Color(0xFF333333);
 
-class EsusuWelcomePage extends StatelessWidget {
+class EsusuWelcomePage extends ConsumerStatefulWidget {
   const EsusuWelcomePage({super.key});
 
   @override
+  ConsumerState<EsusuWelcomePage> createState() => _EsusuWelcomePageState();
+}
+
+class _EsusuWelcomePageState extends ConsumerState<EsusuWelcomePage> {
+  bool _isCheckingEligibility = false;
+  EsusuEligibilityResponse? _eligibility;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkEligibility();
+    });
+  }
+
+  Future<void> _checkEligibility() async {
+    final communityState = ref.read(communityProvider);
+    final activeCommunity = communityState.activeCommunity;
+
+    if (activeCommunity == null) {
+      setState(() {
+        _errorMessage = 'No active community';
+      });
+      return;
+    }
+
+    setState(() {
+      _isCheckingEligibility = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final repository = ref.read(esusuRepositoryProvider);
+      final response = await repository.checkEligibility(activeCommunity.id);
+
+      setState(() {
+        _isCheckingEligibility = false;
+        _eligibility = response;
+      });
+
+      // Set community context in the creation provider
+      if (response.canCreateEsusu) {
+        ref.read(esusuCreationProvider.notifier).setCommunityContext(
+              communityId: activeCommunity.id,
+              communityName: activeCommunity.name,
+              memberCount: response.memberCount ?? activeCommunity.memberCount,
+            );
+      }
+    } catch (e) {
+      setState(() {
+        _isCheckingEligibility = false;
+        _errorMessage = 'Failed to check eligibility';
+      });
+    }
+  }
+
+  void _handleCreateEsusu() {
+    if (_eligibility == null || !_eligibility!.canCreateEsusu) {
+      _showIneligibilityMessage();
+      return;
+    }
+
+    // Reset the creation provider before starting
+    ref.read(esusuCreationProvider.notifier).reset();
+
+    // Re-set community context
+    final communityState = ref.read(communityProvider);
+    if (communityState.activeCommunity != null) {
+      ref.read(esusuCreationProvider.notifier).setCommunityContext(
+            communityId: communityState.activeCommunity!.id,
+            communityName: communityState.activeCommunity!.name,
+            memberCount: _eligibility?.memberCount ??
+                communityState.activeCommunity!.memberCount,
+          );
+    }
+
+    context.push(AppRoutes.createEsusu);
+  }
+
+  void _showIneligibilityMessage() {
+    if (_eligibility == null) return;
+
+    String title;
+    String message;
+    String? ctaText;
+    VoidCallback? ctaAction;
+
+    switch (_eligibility!.reason) {
+      case EsusuIneligibilityReason.notAdmin:
+        title = 'Admin Required';
+        message = 'Only community admins can create an Esusu. '
+            'Contact your community admin to create one.';
+        break;
+      case EsusuIneligibilityReason.insufficientMembers:
+        title = 'More Members Needed';
+        message = 'You need at least 3 members to create an Esusu. '
+            'Invite more members to get started.';
+        ctaText = 'Invite Members';
+        ctaAction = () {
+          Navigator.pop(context);
+          final communityId =
+              ref.read(communityProvider).activeCommunity?.id ?? '';
+          context.push('${AppRoutes.inviteLink}/$communityId');
+        };
+        break;
+      case EsusuIneligibilityReason.noCommunityWallet:
+        title = 'Community Wallet Required';
+        message = 'Please set up your community wallet first to create an Esusu.';
+        ctaText = 'Setup Wallet';
+        ctaAction = () {
+          Navigator.pop(context);
+          final communityId =
+              ref.read(communityProvider).activeCommunity?.id ?? '';
+          context.push('${AppRoutes.communityWalletSetup}/$communityId');
+        };
+        break;
+      case EsusuIneligibilityReason.defaultCommunity:
+        title = 'Not Available';
+        message =
+            'Esusu is not available for the default FinSquare community. '
+            'Please create or join a custom community.';
+        break;
+      default:
+        title = 'Cannot Create Esusu';
+        message = _eligibility!.message ?? 'You are not eligible to create an Esusu.';
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEE2E2),
+                borderRadius: BorderRadius.circular(32),
+              ),
+              child: const Icon(
+                Icons.info_outline,
+                color: Color(0xFFEF4444),
+                size: 32,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              style: TextStyle(
+                fontFamily: AppTextStyles.fontFamily,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: Colors.black,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: AppTextStyles.fontFamily,
+                fontSize: 14,
+                fontWeight: FontWeight.w400,
+                color: const Color(0xFF606060),
+              ),
+            ),
+            const SizedBox(height: 24),
+            if (ctaText != null && ctaAction != null)
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: ctaAction,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _esusuPrimaryColor,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(43),
+                    ),
+                  ),
+                  child: Text(
+                    ctaText,
+                    style: TextStyle(
+                      fontFamily: AppTextStyles.fontFamily,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            if (ctaText != null) const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(
+                  ctaText != null ? 'Close' : 'Got it',
+                  style: TextStyle(
+                    fontFamily: AppTextStyles.fontFamily,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: _esusuPrimaryColor,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final canCreate =
+        _eligibility?.canCreateEsusu == true && !_isCheckingEligibility;
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -52,7 +290,7 @@ class EsusuWelcomePage extends StatelessWidget {
                       fontFamily: AppTextStyles.fontFamily,
                       fontSize: 20,
                       fontWeight: FontWeight.w800,
-                      color: Color(0xFF020014),
+                      color: const Color(0xFF020014),
                     ),
                   ),
                 ),
@@ -60,13 +298,15 @@ class EsusuWelcomePage extends StatelessWidget {
                 _esusuHomeWidget(
                   icon: 'assets/svgs/esusu/Frame 2609038.svg',
                   title: 'Transparent and Fair',
-                  description: 'See all participants, monitor turns, debit and credit',
+                  description:
+                      'See all participants, monitor turns, debit and credit',
                 ),
                 const SizedBox(height: 20),
                 _esusuHomeWidget(
                   icon: 'assets/svgs/esusu/Frame 2609038 (1).svg',
                   title: 'Instant Payments',
-                  description: 'Instant payment on the agreed date for all participants.',
+                  description:
+                      'Instant payment on the agreed date for all participants.',
                 ),
                 const SizedBox(height: 20),
                 _esusuHomeWidget(
@@ -75,13 +315,24 @@ class EsusuWelcomePage extends StatelessWidget {
                   description: 'Your funds are safe, and payments are hassle-free',
                 ),
                 const Spacer(),
+                if (_isCheckingEligibility)
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: 16),
+                    child: SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: _esusuPrimaryColor,
+                      ),
+                    ),
+                  ),
                 DefaultButton(
-                  isButtonEnabled: true,
-                  onPressed: () {
-                    context.push(AppRoutes.configureEsusu);
-                  },
+                  isButtonEnabled: !_isCheckingEligibility,
+                  onPressed: _handleCreateEsusu,
                   title: 'Create Esusu',
-                  buttonColor: _esusuPrimaryColor,
+                  buttonColor:
+                      canCreate ? _esusuPrimaryColor : Colors.grey.shade400,
                   height: 54,
                 ),
               ],
@@ -120,7 +371,7 @@ class EsusuWelcomePage extends StatelessWidget {
                   fontFamily: AppTextStyles.fontFamily,
                   fontSize: 12,
                   fontWeight: FontWeight.w400,
-                  color: Color(0xFF606060),
+                  color: const Color(0xFF606060),
                 ),
               )
             ],

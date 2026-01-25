@@ -148,14 +148,20 @@ class _CommunityWalletSetupPageState
     setState(() => _isCreatingWallet = true);
 
     try {
-      // Get signatory IDs (signatoryB and signatoryC odooIds)
-      final signatoryIds = <String>[];
-      if (_signatoryB != null) signatoryIds.add(_signatoryB!.odooId);
-      if (_signatoryC != null) signatoryIds.add(_signatoryC!.odooId);
+      // Ensure both signatories are selected
+      if (_signatoryB == null || _signatoryC == null) {
+        setState(() {
+          _isCreatingWallet = false;
+          _error = 'Please select both Signatory B and Signatory C';
+        });
+        showWarningSnackbar('Please select both signatories');
+        return;
+      }
 
       final success = await ref.read(communityWalletProvider.notifier).createWallet(
         communityId: widget.communityId,
-        signatoryIds: signatoryIds,
+        signatoryBUserId: _signatoryB!.odooId,
+        signatoryCUserId: _signatoryC!.odooId,
         approvalRule: _getApprovalRuleString(),
         transactionPin: _pin,
       );

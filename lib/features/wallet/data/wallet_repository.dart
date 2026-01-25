@@ -732,8 +732,10 @@ class WalletRepository {
     final data = response.data['data'];
     if (data == null) return [];
 
-    if (data is List) {
-      return data.map((e) => CoAdmin.fromJson(e as Map<String, dynamic>)).toList();
+    // Backend returns { coAdmins: [...], count: N }
+    final coAdmins = data['coAdmins'];
+    if (coAdmins is List) {
+      return coAdmins.map((e) => CoAdmin.fromJson(e as Map<String, dynamic>)).toList();
     }
     return [];
   }
@@ -754,6 +756,12 @@ class WalletRepository {
       data: request.toJson(),
     );
     return CommunityWalletResponse.fromJson(response.data);
+  }
+
+  /// Get community wallet details
+  Future<GetCommunityWalletResponse> getCommunityWallet(String communityId) async {
+    final response = await _apiClient.get(ApiEndpoints.getCommunityWallet(communityId));
+    return GetCommunityWalletResponse.fromJson(response.data);
   }
 }
 
@@ -896,24 +904,27 @@ class CommunityWalletEligibility {
 
 /// Create Community Wallet Request
 class CreateCommunityWalletRequest {
-  final List<String> signatoryIds;
+  final String signatoryBUserId;
+  final String signatoryCUserId;
   final String approvalRule;
   final String transactionPin;
 
   CreateCommunityWalletRequest({
-    required this.signatoryIds,
+    required this.signatoryBUserId,
+    required this.signatoryCUserId,
     required this.approvalRule,
     required this.transactionPin,
   });
 
   Map<String, dynamic> toJson() => {
-    'signatoryIds': signatoryIds,
+    'signatoryBUserId': signatoryBUserId,
+    'signatoryCUserId': signatoryCUserId,
     'approvalRule': approvalRule,
     'transactionPin': transactionPin,
   };
 }
 
-/// Community Wallet Response
+/// Community Wallet Response (for create wallet)
 class CommunityWalletResponse {
   final bool success;
   final String message;
@@ -934,6 +945,112 @@ class CommunityWalletResponse {
       message: json['message'] ?? '',
       walletId: data?['walletId'] ?? data?['id'],
       accountNumber: data?['accountNumber'],
+    );
+  }
+}
+
+/// Signatory model for community wallet
+class WalletSignatory {
+  final String userId;
+  final String fullName;
+  final String role;
+  final String? label;
+
+  WalletSignatory({
+    required this.userId,
+    required this.fullName,
+    required this.role,
+    this.label,
+  });
+
+  factory WalletSignatory.fromJson(Map<String, dynamic> json) {
+    return WalletSignatory(
+      userId: json['userId'] ?? '',
+      fullName: json['fullName'] ?? '',
+      role: json['role'] ?? '',
+      label: json['label'],
+    );
+  }
+}
+
+/// Community Wallet Details model
+class CommunityWalletDetails {
+  final String id;
+  final String balance;
+  final List<WalletSignatory> signatories;
+  final String approvalRule;
+  final String? externalWalletId;
+  final bool isActive;
+  final DateTime? createdAt;
+
+  CommunityWalletDetails({
+    required this.id,
+    required this.balance,
+    required this.signatories,
+    required this.approvalRule,
+    this.externalWalletId,
+    required this.isActive,
+    this.createdAt,
+  });
+
+  factory CommunityWalletDetails.fromJson(Map<String, dynamic> json) {
+    final signatoriesJson = json['signatories'] as List<dynamic>? ?? [];
+    return CommunityWalletDetails(
+      id: json['id'] ?? '',
+      balance: json['balance']?.toString() ?? '0',
+      signatories: signatoriesJson
+          .map((e) => WalletSignatory.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      approvalRule: json['approvalRule'] ?? '',
+      externalWalletId: json['externalWalletId'],
+      isActive: json['isActive'] ?? false,
+      createdAt: json['createdAt'] != null
+          ? DateTime.tryParse(json['createdAt'])
+          : null,
+    );
+  }
+
+  double get balanceAsDouble => double.tryParse(balance) ?? 0.0;
+}
+
+/// Get Community Wallet Response
+class GetCommunityWalletResponse {
+  final bool success;
+  final String message;
+  final String communityId;
+  final String communityName;
+  final bool hasWallet;
+  final bool isDefault;
+  final CommunityWalletDetails? wallet;
+  final bool canCreate;
+  final bool canWithdraw;
+
+  GetCommunityWalletResponse({
+    required this.success,
+    required this.message,
+    required this.communityId,
+    required this.communityName,
+    required this.hasWallet,
+    required this.isDefault,
+    this.wallet,
+    this.canCreate = false,
+    this.canWithdraw = false,
+  });
+
+  factory GetCommunityWalletResponse.fromJson(Map<String, dynamic> json) {
+    final data = json['data'] as Map<String, dynamic>? ?? {};
+    final walletJson = data['wallet'] as Map<String, dynamic>?;
+
+    return GetCommunityWalletResponse(
+      success: json['success'] ?? false,
+      message: json['message'] ?? '',
+      communityId: data['communityId'] ?? '',
+      communityName: data['communityName'] ?? '',
+      hasWallet: data['hasWallet'] ?? false,
+      isDefault: data['isDefault'] ?? false,
+      wallet: walletJson != null ? CommunityWalletDetails.fromJson(walletJson) : null,
+      canCreate: data['canCreate'] ?? false,
+      canWithdraw: data['canWithdraw'] ?? false,
     );
   }
 }

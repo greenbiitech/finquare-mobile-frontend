@@ -1,101 +1,34 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:finsquare_mobile_app/config/routes/app_router.dart';
 import 'package:finsquare_mobile_app/config/theme/app_theme.dart';
 import 'package:finsquare_mobile_app/core/widgets/back_button.dart';
 import 'package:finsquare_mobile_app/core/widgets/default_button.dart';
+import 'package:finsquare_mobile_app/features/esusu/data/esusu_repository.dart';
+import 'package:finsquare_mobile_app/features/esusu/presentation/providers/esusu_creation_provider.dart';
 
 const Color _esusuPrimaryColor = Color(0xFF8B20E9);
 
-class AddParticipantsPage extends StatefulWidget {
-  final int totalParticipants;
-
-  const AddParticipantsPage({
-    super.key,
-    this.totalParticipants = 12,
-  });
+class AddParticipantsPage extends ConsumerStatefulWidget {
+  const AddParticipantsPage({super.key});
 
   @override
-  State<AddParticipantsPage> createState() => _AddParticipantsPageState();
+  ConsumerState<AddParticipantsPage> createState() => _AddParticipantsPageState();
 }
 
-class _AddParticipantsPageState extends State<AddParticipantsPage> {
-  final List<_Participant> _selectedParticipants = [];
-  final TextEditingController _searchController = TextEditingController();
-
-  // Dummy data for available members
-  final List<_Participant> _availableMembers = [
-    _Participant(
-      id: '1',
-      name: 'Chinonso Okafor',
-      email: 'Chinonso@gmail.com',
-      avatarColor: Colors.red.shade200,
-      emoji: '👩‍🦱',
-    ),
-    _Participant(
-      id: '2',
-      name: 'Adeola Adebayo',
-      email: 'Adeola@gmail.com',
-      avatarColor: Colors.yellow.shade200,
-      emoji: '👩',
-    ),
-    _Participant(
-      id: '3',
-      name: 'Ngozi Nwosu',
-      email: 'Ngozi@gmail.com',
-      avatarColor: Colors.purple.shade200,
-      emoji: '👩‍🦳',
-    ),
-    _Participant(
-      id: '4',
-      name: 'Emeka Ibe',
-      email: 'Emeka@gmail.com',
-      avatarColor: Colors.pink.shade200,
-      emoji: '👨‍🦱',
-    ),
-    _Participant(
-      id: '5',
-      name: 'Ify Uche',
-      email: 'Ify@gmail.com',
-      avatarColor: Colors.orange.shade200,
-      emoji: '👨',
-    ),
-    _Participant(
-      id: '6',
-      name: 'Tunde Alabi',
-      email: 'Tunde@gmail.com',
-      avatarColor: Colors.amber.shade200,
-      emoji: '👱',
-    ),
-    _Participant(
-      id: '7',
-      name: 'Emeka Nwosu',
-      email: 'Emeka.nwosu@example.com',
-      avatarColor: Colors.pink.shade200,
-      emoji: '👨‍🦰',
-    ),
-    _Participant(
-      id: '8',
-      name: 'Adaobi Eze',
-      email: 'Adaobi.eze@yahoo.com',
-      avatarColor: Colors.blue.shade200,
-      emoji: '👩‍🦰',
-    ),
-    _Participant(
-      id: '9',
-      name: 'Uche Nwankwo',
-      email: 'Uche.nwankwo@outlook.com',
-      avatarColor: Colors.pink.shade200,
-      emoji: '🧔',
-    ),
-  ];
-
-  int get _participantsLeft => widget.totalParticipants - _selectedParticipants.length;
-
+class _AddParticipantsPageState extends ConsumerState<AddParticipantsPage> {
   @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(esusuCreationProvider.notifier).loadCommunityMembers();
+    });
+  }
+
+  int get _participantsLeft {
+    final state = ref.read(esusuCreationProvider);
+    return (state.numberOfParticipants ?? 0) - state.selectedParticipants.length;
   }
 
   void _showSelectMemberModal() {
@@ -107,28 +40,34 @@ class _AddParticipantsPageState extends State<AddParticipantsPage> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) => _SelectMemberModal(
-        availableMembers: _availableMembers,
-        selectedParticipants: _selectedParticipants,
-        onAdd: (participant) {
-          if (_participantsLeft > 0) {
-            setState(() {
-              _selectedParticipants.add(participant);
-            });
-          }
+        onAdd: (member) {
+          ref.read(esusuCreationProvider.notifier).addParticipant(member);
         },
-        searchController: _searchController,
+        onRemove: (memberId) {
+          ref.read(esusuCreationProvider.notifier).removeParticipant(memberId);
+        },
       ),
     );
   }
 
-  void _removeParticipant(_Participant participant) {
-    setState(() {
-      _selectedParticipants.removeWhere((p) => p.id == participant.id);
-    });
+  void _removeParticipant(String memberId) {
+    ref.read(esusuCreationProvider.notifier).removeParticipant(memberId);
+  }
+
+  void _handleNext() {
+    final state = ref.read(esusuCreationProvider);
+    if (state.isParticipantsComplete) {
+      context.push(AppRoutes.selectPayoutOrder);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final state = ref.watch(esusuCreationProvider);
+    final selectedParticipants = state.selectedParticipants;
+    final totalRequired = state.numberOfParticipants ?? 0;
+    final participantsLeft = totalRequired - selectedParticipants.length;
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -173,28 +112,32 @@ class _AddParticipantsPageState extends State<AddParticipantsPage> {
 
                     // Select Participant dropdown
                     GestureDetector(
-                      onTap: _showSelectMemberModal,
+                      onTap: participantsLeft > 0 ? _showSelectMemberModal : null,
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                         decoration: BoxDecoration(
-                          color: Color(0xFFF3F3F3),
+                          color: participantsLeft > 0
+                              ? const Color(0xFFF3F3F3)
+                              : const Color(0xFFFAFAFA),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              'Select Participant',
+                              participantsLeft > 0
+                                  ? 'Select Participant'
+                                  : 'All participants added',
                               style: TextStyle(
                                 fontFamily: AppTextStyles.fontFamily,
                                 fontSize: 14,
                                 fontWeight: FontWeight.w400,
-                                color: Color(0xFF606060),
+                                color: const Color(0xFF606060),
                               ),
                             ),
                             Icon(
                               Icons.keyboard_arrow_down,
-                              color: Colors.black,
+                              color: participantsLeft > 0 ? Colors.black : Colors.grey,
                             ),
                           ],
                         ),
@@ -204,9 +147,16 @@ class _AddParticipantsPageState extends State<AddParticipantsPage> {
 
                     // Content based on state
                     Expanded(
-                      child: _selectedParticipants.isEmpty
-                          ? _buildEmptyState()
-                          : _buildParticipantsList(),
+                      child: state.isLoading
+                          ? const Center(
+                              child: CircularProgressIndicator(
+                                color: _esusuPrimaryColor,
+                              ),
+                            )
+                          : selectedParticipants.isEmpty
+                              ? _buildEmptyState(totalRequired)
+                              : _buildParticipantsList(
+                                  selectedParticipants, participantsLeft),
                     ),
                   ],
                 ),
@@ -215,12 +165,12 @@ class _AddParticipantsPageState extends State<AddParticipantsPage> {
             Padding(
               padding: const EdgeInsets.all(20.0),
               child: DefaultButton(
-                isButtonEnabled: _selectedParticipants.isNotEmpty,
-                onPressed: () {
-                  context.push(AppRoutes.selectPayoutOrder);
-                },
+                isButtonEnabled: state.isParticipantsComplete,
+                onPressed: _handleNext,
                 title: 'Next',
-                buttonColor: _esusuPrimaryColor,
+                buttonColor: state.isParticipantsComplete
+                    ? _esusuPrimaryColor
+                    : Colors.grey.shade400,
                 height: 54,
               ),
             ),
@@ -230,7 +180,7 @@ class _AddParticipantsPageState extends State<AddParticipantsPage> {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(int totalRequired) {
     return Column(
       children: [
         const SizedBox(height: 40),
@@ -245,7 +195,7 @@ class _AddParticipantsPageState extends State<AddParticipantsPage> {
         ),
         const SizedBox(height: 8),
         Text(
-          '$_participantsLeft left',
+          '$totalRequired required',
           style: TextStyle(
             fontFamily: AppTextStyles.fontFamily,
             fontSize: 14,
@@ -255,12 +205,12 @@ class _AddParticipantsPageState extends State<AddParticipantsPage> {
         ),
         const SizedBox(height: 8),
         Text(
-          'Invite your participants to join this savings plan,',
+          'Select participants from your community members',
           style: TextStyle(
             fontFamily: AppTextStyles.fontFamily,
             fontSize: 14,
             fontWeight: FontWeight.w400,
-            color: Color(0xFF606060),
+            color: const Color(0xFF606060),
           ),
         ),
         const SizedBox(height: 30),
@@ -283,7 +233,7 @@ class _AddParticipantsPageState extends State<AddParticipantsPage> {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: Color(0xFFE0E0E0),
+              color: const Color(0xFFE0E0E0),
               borderRadius: BorderRadius.circular(8),
             ),
           ),
@@ -292,7 +242,7 @@ class _AddParticipantsPageState extends State<AddParticipantsPage> {
             width: 100,
             height: 16,
             decoration: BoxDecoration(
-              color: Color(0xFFE0E0E0),
+              color: const Color(0xFFE0E0E0),
               borderRadius: BorderRadius.circular(4),
             ),
           ),
@@ -301,7 +251,7 @@ class _AddParticipantsPageState extends State<AddParticipantsPage> {
             width: 60,
             height: 16,
             decoration: BoxDecoration(
-              color: Color(0xFFE0E0E0),
+              color: const Color(0xFFE0E0E0),
               borderRadius: BorderRadius.circular(4),
             ),
           ),
@@ -310,7 +260,8 @@ class _AddParticipantsPageState extends State<AddParticipantsPage> {
     );
   }
 
-  Widget _buildParticipantsList() {
+  Widget _buildParticipantsList(
+      List<EsusuCommunityMember> participants, int participantsLeft) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -328,12 +279,13 @@ class _AddParticipantsPageState extends State<AddParticipantsPage> {
               ),
             ),
             Text(
-              '$_participantsLeft left',
+              participantsLeft > 0 ? '$participantsLeft left' : 'All added',
               style: TextStyle(
                 fontFamily: AppTextStyles.fontFamily,
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
-                color: _esusuPrimaryColor,
+                color:
+                    participantsLeft > 0 ? _esusuPrimaryColor : Colors.green,
               ),
             ),
           ],
@@ -341,10 +293,11 @@ class _AddParticipantsPageState extends State<AddParticipantsPage> {
         const SizedBox(height: 16),
         Expanded(
           child: ListView.separated(
-            itemCount: _selectedParticipants.length,
-            separatorBuilder: (context, index) => const Divider(height: 1, color: Color(0xFFE0E0E0)),
+            itemCount: participants.length,
+            separatorBuilder: (context, index) =>
+                const Divider(height: 1, color: Color(0xFFE0E0E0)),
             itemBuilder: (context, index) {
-              final participant = _selectedParticipants[index];
+              final participant = participants[index];
               return _buildParticipantTile(participant);
             },
           ),
@@ -353,34 +306,68 @@ class _AddParticipantsPageState extends State<AddParticipantsPage> {
     );
   }
 
-  Widget _buildParticipantTile(_Participant participant) {
+  Widget _buildParticipantTile(EsusuCommunityMember participant) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
       child: Row(
         children: [
           CircleAvatar(
             radius: 24,
-            backgroundColor: participant.avatarColor,
-            child: Text(
-              participant.emoji,
-              style: TextStyle(
-                fontSize: 24,
-              ),
-            ),
+            backgroundColor: _getAvatarColor(participant.fullName),
+            backgroundImage: participant.photo != null
+                ? NetworkImage(participant.photo!)
+                : null,
+            child: participant.photo == null
+                ? Text(
+                    _getInitials(participant.fullName),
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  )
+                : null,
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  participant.name,
-                  style: TextStyle(
-                    fontFamily: AppTextStyles.fontFamily,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black,
-                  ),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        participant.fullName,
+                        style: TextStyle(
+                          fontFamily: AppTextStyles.fontFamily,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (participant.isAdmin) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: _esusuPrimaryColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          'Admin',
+                          style: TextStyle(
+                            fontFamily: AppTextStyles.fontFamily,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                            color: _esusuPrimaryColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
                 Text(
                   participant.email,
@@ -388,17 +375,17 @@ class _AddParticipantsPageState extends State<AddParticipantsPage> {
                     fontFamily: AppTextStyles.fontFamily,
                     fontSize: 12,
                     fontWeight: FontWeight.w400,
-                    color: Color(0xFF606060),
+                    color: const Color(0xFF606060),
                   ),
                 ),
               ],
             ),
           ),
           GestureDetector(
-            onTap: () => _removeParticipant(participant),
+            onTap: () => _removeParticipant(participant.id),
             child: Container(
               padding: const EdgeInsets.all(4),
-              child: Icon(
+              child: const Icon(
                 Icons.cancel_outlined,
                 color: Color(0xFF9E9E9E),
                 size: 24,
@@ -409,35 +396,46 @@ class _AddParticipantsPageState extends State<AddParticipantsPage> {
       ),
     );
   }
+
+  String _getInitials(String name) {
+    final parts = name.split(' ');
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    }
+    return parts[0][0].toUpperCase();
+  }
+
+  Color _getAvatarColor(String name) {
+    final colors = [
+      Colors.red.shade400,
+      Colors.blue.shade400,
+      Colors.green.shade400,
+      Colors.orange.shade400,
+      Colors.purple.shade400,
+      Colors.teal.shade400,
+      Colors.pink.shade400,
+      Colors.indigo.shade400,
+    ];
+    return colors[name.hashCode % colors.length];
+  }
 }
 
-class _SelectMemberModal extends StatefulWidget {
-  final List<_Participant> availableMembers;
-  final List<_Participant> selectedParticipants;
-  final Function(_Participant) onAdd;
-  final TextEditingController searchController;
+class _SelectMemberModal extends ConsumerStatefulWidget {
+  final Function(EsusuCommunityMember) onAdd;
+  final Function(String) onRemove;
 
   const _SelectMemberModal({
-    required this.availableMembers,
-    required this.selectedParticipants,
     required this.onAdd,
-    required this.searchController,
+    required this.onRemove,
   });
 
   @override
-  State<_SelectMemberModal> createState() => _SelectMemberModalState();
+  ConsumerState<_SelectMemberModal> createState() => _SelectMemberModalState();
 }
 
-class _SelectMemberModalState extends State<_SelectMemberModal> {
-  late List<_Participant> _filteredMembers;
-  late TextEditingController _searchController;
-
-  @override
-  void initState() {
-    super.initState();
-    _searchController = TextEditingController();
-    _filteredMembers = widget.availableMembers;
-  }
+class _SelectMemberModalState extends ConsumerState<_SelectMemberModal> {
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
   @override
   void dispose() {
@@ -445,26 +443,30 @@ class _SelectMemberModalState extends State<_SelectMemberModal> {
     super.dispose();
   }
 
-  void _filterMembers(String query) {
-    setState(() {
-      if (query.isEmpty) {
-        _filteredMembers = widget.availableMembers;
-      } else {
-        _filteredMembers = widget.availableMembers
-            .where((member) =>
-                member.name.toLowerCase().contains(query.toLowerCase()) ||
-                member.email.toLowerCase().contains(query.toLowerCase()))
-            .toList();
-      }
-    });
+  List<EsusuCommunityMember> _getFilteredMembers(
+      List<EsusuCommunityMember> members) {
+    if (_searchQuery.isEmpty) return members;
+    return members
+        .where((member) =>
+            member.fullName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+            member.email.toLowerCase().contains(_searchQuery.toLowerCase()))
+        .toList();
   }
 
-  bool _isAlreadySelected(_Participant participant) {
-    return widget.selectedParticipants.any((p) => p.id == participant.id);
+  bool _isAlreadySelected(
+      EsusuCommunityMember member, List<EsusuCommunityMember> selectedParticipants) {
+    return selectedParticipants.any((p) => p.id == member.id);
   }
 
   @override
   Widget build(BuildContext context) {
+    final state = ref.watch(esusuCreationProvider);
+    final availableMembers = state.availableMembers;
+    final selectedParticipants = state.selectedParticipants;
+    final filteredMembers = _getFilteredMembers(availableMembers);
+    final participantsLeft =
+        (state.numberOfParticipants ?? 0) - selectedParticipants.length;
+
     return DraggableScrollableSheet(
       initialChildSize: 0.60,
       minChildSize: 0.4,
@@ -479,7 +481,7 @@ class _SelectMemberModalState extends State<_SelectMemberModal> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Color(0xFFE0E0E0),
+                color: const Color(0xFFE0E0E0),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -490,25 +492,43 @@ class _SelectMemberModalState extends State<_SelectMemberModal> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Title
-                  Text(
-                    'Select Member',
-                    style: TextStyle(
-                      fontFamily: AppTextStyles.fontFamily,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Select Member',
+                        style: TextStyle(
+                          fontFamily: AppTextStyles.fontFamily,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black,
+                        ),
+                      ),
+                      Text(
+                        '$participantsLeft left',
+                        style: TextStyle(
+                          fontFamily: AppTextStyles.fontFamily,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: _esusuPrimaryColor,
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 16),
                   // Search field
                   Container(
                     decoration: BoxDecoration(
-                      color: Color(0xFFF3F3F3),
+                      color: const Color(0xFFF3F3F3),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: TextField(
                       controller: _searchController,
-                      onChanged: _filterMembers,
+                      onChanged: (value) {
+                        setState(() {
+                          _searchQuery = value;
+                        });
+                      },
                       style: TextStyle(
                         fontFamily: AppTextStyles.fontFamily,
                         fontSize: 14,
@@ -521,14 +541,15 @@ class _SelectMemberModalState extends State<_SelectMemberModal> {
                           fontFamily: AppTextStyles.fontFamily,
                           fontSize: 14,
                           fontWeight: FontWeight.w400,
-                          color: Color(0xFF9E9E9E),
+                          color: const Color(0xFF9E9E9E),
                         ),
-                        prefixIcon: Icon(
+                        prefixIcon: const Icon(
                           Icons.search,
                           color: Color(0xFF606060),
                         ),
                         border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 14),
                       ),
                     ),
                   ),
@@ -537,17 +558,42 @@ class _SelectMemberModalState extends State<_SelectMemberModal> {
             ),
             const SizedBox(height: 16),
             Expanded(
-              child: ListView.separated(
-                controller: scrollController,
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                itemCount: _filteredMembers.length,
-                separatorBuilder: (context, index) => const Divider(height: 1, color: Color(0xFFE0E0E0)),
-                itemBuilder: (context, index) {
-                  final member = _filteredMembers[index];
-                  final isSelected = _isAlreadySelected(member);
-                  return _buildMemberTile(member, isSelected);
-                },
-              ),
+              child: state.isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        color: _esusuPrimaryColor,
+                      ),
+                    )
+                  : filteredMembers.isEmpty
+                      ? Center(
+                          child: Text(
+                            _searchQuery.isEmpty
+                                ? 'No members available'
+                                : 'No members found',
+                            style: TextStyle(
+                              fontFamily: AppTextStyles.fontFamily,
+                              fontSize: 14,
+                              color: const Color(0xFF606060),
+                            ),
+                          ),
+                        )
+                      : ListView.separated(
+                          controller: scrollController,
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          itemCount: filteredMembers.length,
+                          separatorBuilder: (context, index) =>
+                              const Divider(height: 1, color: Color(0xFFE0E0E0)),
+                          itemBuilder: (context, index) {
+                            final member = filteredMembers[index];
+                            final isSelected =
+                                _isAlreadySelected(member, selectedParticipants);
+                            return _buildMemberTile(
+                              member,
+                              isSelected,
+                              participantsLeft,
+                            );
+                          },
+                        ),
             ),
             Padding(
               padding: const EdgeInsets.all(20.0),
@@ -565,34 +611,73 @@ class _SelectMemberModalState extends State<_SelectMemberModal> {
     );
   }
 
-  Widget _buildMemberTile(_Participant member, bool isSelected) {
+  Widget _buildMemberTile(
+    EsusuCommunityMember member,
+    bool isSelected,
+    int participantsLeft,
+  ) {
+    final canAdd = !isSelected && participantsLeft > 0;
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
       child: Row(
         children: [
           CircleAvatar(
             radius: 24,
-            backgroundColor: member.avatarColor,
-            child: Text(
-              member.emoji,
-              style: TextStyle(
-                fontSize: 24,
-              ),
-            ),
+            backgroundColor: _getAvatarColor(member.fullName),
+            backgroundImage:
+                member.photo != null ? NetworkImage(member.photo!) : null,
+            child: member.photo == null
+                ? Text(
+                    _getInitials(member.fullName),
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  )
+                : null,
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  member.name,
-                  style: TextStyle(
-                    fontFamily: AppTextStyles.fontFamily,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black,
-                  ),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        member.fullName,
+                        style: TextStyle(
+                          fontFamily: AppTextStyles.fontFamily,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (member.isAdmin) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: _esusuPrimaryColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          'Admin',
+                          style: TextStyle(
+                            fontFamily: AppTextStyles.fontFamily,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                            color: _esusuPrimaryColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
                 Text(
                   member.email,
@@ -600,25 +685,32 @@ class _SelectMemberModalState extends State<_SelectMemberModal> {
                     fontFamily: AppTextStyles.fontFamily,
                     fontSize: 12,
                     fontWeight: FontWeight.w400,
-                    color: Color(0xFF606060),
+                    color: const Color(0xFF606060),
                   ),
                 ),
               ],
             ),
           ),
           GestureDetector(
-            onTap: isSelected
-                ? null
-                : () {
+            onTap: canAdd
+                ? () {
                     widget.onAdd(member);
                     setState(() {});
-                  },
+                  }
+                : isSelected
+                    ? () {
+                        widget.onRemove(member.id);
+                        setState(() {});
+                      }
+                    : null,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
                 color: isSelected ? _esusuPrimaryColor : null,
                 border: Border.all(
-                  color: _esusuPrimaryColor,
+                  color: canAdd || isSelected
+                      ? _esusuPrimaryColor
+                      : Colors.grey.shade300,
                 ),
                 borderRadius: BorderRadius.circular(20),
               ),
@@ -628,7 +720,11 @@ class _SelectMemberModalState extends State<_SelectMemberModal> {
                   fontFamily: AppTextStyles.fontFamily,
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
-                  color: isSelected ? Colors.white : _esusuPrimaryColor,
+                  color: isSelected
+                      ? Colors.white
+                      : canAdd
+                          ? _esusuPrimaryColor
+                          : Colors.grey,
                 ),
               ),
             ),
@@ -637,20 +733,26 @@ class _SelectMemberModalState extends State<_SelectMemberModal> {
       ),
     );
   }
-}
 
-class _Participant {
-  final String id;
-  final String name;
-  final String email;
-  final Color avatarColor;
-  final String emoji;
+  String _getInitials(String name) {
+    final parts = name.split(' ');
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    }
+    return parts[0][0].toUpperCase();
+  }
 
-  _Participant({
-    required this.id,
-    required this.name,
-    required this.email,
-    required this.avatarColor,
-    required this.emoji,
-  });
+  Color _getAvatarColor(String name) {
+    final colors = [
+      Colors.red.shade400,
+      Colors.blue.shade400,
+      Colors.green.shade400,
+      Colors.orange.shade400,
+      Colors.purple.shade400,
+      Colors.teal.shade400,
+      Colors.pink.shade400,
+      Colors.indigo.shade400,
+    ];
+    return colors[name.hashCode % colors.length];
+  }
 }

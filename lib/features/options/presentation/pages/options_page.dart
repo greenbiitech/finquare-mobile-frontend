@@ -543,12 +543,12 @@ class _OptionsPageState extends ConsumerState<OptionsPage> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => CommunitySelectionModal(
+      builder: (modalContext) => CommunitySelectionModal(
         userCommunities: filteredCommunities,
         currentCommunityId: communityState.activeCommunity?.id,
         onCommunitySelected: (selectedCommunity) async {
-          // Close the modal
-          Navigator.pop(context);
+          // Close the modal using modal's context
+          Navigator.pop(modalContext);
 
           // Don't switch if already on the selected community
           if (selectedCommunity.id == communityState.activeCommunity?.id) {
@@ -631,8 +631,8 @@ class _OptionsPageState extends ConsumerState<OptionsPage> {
           }
         },
         onCreateNewCommunity: () {
-          // Close the modal
-          Navigator.pop(context);
+          // Close the modal using modal's context
+          Navigator.pop(modalContext);
           // Navigate to create community flow
           context.push(AppRoutes.onboardCommunity);
         },

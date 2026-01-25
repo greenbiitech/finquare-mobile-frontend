@@ -37,6 +37,17 @@ final transactionHistoryProvider = FutureProvider.autoDispose<List<WalletTransac
   }
 });
 
+/// Provider for community wallet status (family provider to accept communityId)
+final communityWalletStatusProvider = FutureProvider.autoDispose.family<GetCommunityWalletResponse?, String>((ref, communityId) async {
+  if (communityId.isEmpty) return null;
+  final repository = ref.watch(walletRepositoryProvider);
+  try {
+    return await repository.getCommunityWallet(communityId);
+  } catch (e) {
+    return null;
+  }
+});
+
 /// Polling interval for balance refresh while on wallet page
 /// Using 30 seconds to avoid overwhelming the 9PSB API
 const Duration _pollingInterval = Duration(seconds: 30);
@@ -276,9 +287,256 @@ class _WalletPageState extends ConsumerState<WalletPage> {
 
   /// Build community wallet content
   Widget _buildCommunityWalletContent(CommunityState communityState) {
-    // TODO: Check if community wallet exists via API and show appropriate content
-    // For now, show the activation page (wallet not created yet)
-    return const ActivateCommunityWalletPage();
+    final communityId = communityState.activeCommunity?.id ?? '';
+    final walletStatusAsync = ref.watch(communityWalletStatusProvider(communityId));
+
+    return walletStatusAsync.when(
+      loading: () => _buildCommunityWalletShimmer(),
+      error: (error, stack) => _buildCommunityWalletError(),
+      data: (walletResponse) {
+        if (walletResponse == null || !walletResponse.hasWallet) {
+          return const ActivateCommunityWalletPage();
+        }
+        // Show wallet dashboard
+        return _buildCommunityWalletDashboard(walletResponse);
+      },
+    );
+  }
+
+  /// Shimmer loading for community wallet
+  Widget _buildCommunityWalletShimmer() {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey.shade300,
+      highlightColor: Colors.grey.shade100,
+      child: Column(
+        children: [
+          Container(
+            height: 150,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade300,
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Container(
+            height: 80,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade300,
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Error state for community wallet
+  Widget _buildCommunityWalletError() {
+    final communityState = ref.read(communityProvider);
+    final communityId = communityState.activeCommunity?.id ?? '';
+
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.error_outline, size: 48, color: Colors.red[400]),
+          const SizedBox(height: 12),
+          Text(
+            'Failed to load wallet',
+            style: TextStyle(
+              fontFamily: AppTextStyles.fontFamily,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: () => ref.invalidate(communityWalletStatusProvider(communityId)),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+            child: const Text('Retry', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Build community wallet dashboard when wallet exists
+  Widget _buildCommunityWalletDashboard(GetCommunityWalletResponse walletResponse) {
+    final wallet = walletResponse.wallet!;
+    final balance = wallet.balanceAsDouble;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Balance Container
+        Container(
+          padding: const EdgeInsets.all(20),
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: _greyBackground,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Text(
+                'Community Wallet Balance',
+                style: TextStyle(
+                  fontFamily: AppTextStyles.fontFamily,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: _greyIconColor,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                '₦${balance.toStringAsFixed(2)}',
+                style: TextStyle(
+                  fontFamily: AppTextStyles.fontFamily,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 24,
+                  color: Colors.black,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(
+                  color: wallet.isActive ? Colors.green.withValues(alpha: 0.1) : Colors.orange.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  wallet.isActive ? 'Active' : 'Inactive',
+                  style: TextStyle(
+                    fontFamily: AppTextStyles.fontFamily,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: wallet.isActive ? Colors.green : Colors.orange,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        // Signatories Section
+        Text(
+          'Signatories',
+          style: TextStyle(
+            fontFamily: AppTextStyles.fontFamily,
+            fontWeight: FontWeight.w700,
+            fontSize: 14,
+            color: _mainTextColor,
+          ),
+        ),
+        const SizedBox(height: 12),
+        ...wallet.signatories.map((signatory) => _buildSignatoryTile(signatory)),
+        const SizedBox(height: 20),
+        // Approval Rule Section
+        Container(
+          padding: const EdgeInsets.all(16),
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: _greyBackground,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Approval Rule',
+                style: TextStyle(
+                  fontFamily: AppTextStyles.fontFamily,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: _greyIconColor,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _formatApprovalRule(wallet.approvalRule),
+                style: TextStyle(
+                  fontFamily: AppTextStyles.fontFamily,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: _mainTextColor,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Build signatory tile
+  Widget _buildSignatoryTile(WalletSignatory signatory) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: const Color(0xFFE8E8E8)),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 20,
+            backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+            child: Text(
+              signatory.fullName.isNotEmpty ? signatory.fullName[0].toUpperCase() : '?',
+              style: TextStyle(
+                color: AppColors.primary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  signatory.fullName,
+                  style: TextStyle(
+                    fontFamily: AppTextStyles.fontFamily,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  signatory.label ?? signatory.role,
+                  style: TextStyle(
+                    fontFamily: AppTextStyles.fontFamily,
+                    fontSize: 12,
+                    color: _greyTextColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Format approval rule for display
+  String _formatApprovalRule(String rule) {
+    switch (rule) {
+      case 'THIRTY_PERCENT':
+        return 'Any 1 signatory (30%)';
+      case 'FIFTY_PERCENT':
+        return 'Any 2 signatories (50%)';
+      case 'SEVENTY_FIVE_PERCENT':
+        return 'At least 2 signatories including Admin (75%)';
+      case 'HUNDRED_PERCENT':
+        return 'All 3 signatories required (100%)';
+      default:
+        return rule;
+    }
   }
 
   /// Shimmer loading state for wallet balance - matching old design

@@ -411,6 +411,27 @@ class _ConfigureEsusuPageState extends ConsumerState<ConfigureEsusuPage> {
                         },
                         itemLabel: (item) => '$item%',
                       ),
+                      const SizedBox(height: 4),
+                      if (state.commissionPercentage != null && state.totalPool > 0)
+                        Text(
+                          'You will earn ${currencyFormat.format(state.commission)} per cycle',
+                          style: TextStyle(
+                            fontFamily: AppTextStyles.fontFamily,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: _esusuPrimaryColor,
+                          ),
+                        )
+                      else
+                        Text(
+                          'Select participants and amount to see commission',
+                          style: TextStyle(
+                            fontFamily: AppTextStyles.fontFamily,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w400,
+                            color: const Color(0xFF606060),
+                          ),
+                        ),
                       const SizedBox(height: 20),
                     ],
 

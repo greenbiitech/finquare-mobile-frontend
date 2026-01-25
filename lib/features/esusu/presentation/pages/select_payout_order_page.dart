@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:finsquare_mobile_app/config/routes/app_router.dart';
 import 'package:finsquare_mobile_app/config/theme/app_theme.dart';
+import 'package:finsquare_mobile_app/core/services/overlay_loader_service.dart';
 import 'package:finsquare_mobile_app/core/widgets/back_button.dart';
 import 'package:finsquare_mobile_app/core/widgets/default_button.dart';
 import 'package:finsquare_mobile_app/features/esusu/data/esusu_repository.dart';
@@ -56,8 +57,12 @@ class _SelectPayoutOrderPageState extends ConsumerState<SelectPayoutOrderPage> {
   Future<void> _handleCreateEsusu() async {
     Navigator.pop(context); // Close the modal
 
+    ref.showLoading('Creating Esusu...');
+
     final success =
         await ref.read(esusuCreationProvider.notifier).createEsusu();
+
+    ref.hideLoading();
 
     if (success && mounted) {
       context.push(AppRoutes.esusuSuccess);
@@ -91,88 +96,74 @@ class _SelectPayoutOrderPageState extends ConsumerState<SelectPayoutOrderPage> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: Stack(
+        child: Column(
           children: [
-            Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                  child: Row(
-                    children: [
-                      const AppBackButton(),
-                      const SizedBox(width: 20),
-                      Text(
-                        'Select Payout Order',
-                        style: TextStyle(
-                          fontFamily: AppTextStyles.fontFamily,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 18,
-                          color: Colors.black,
-                        ),
-                      )
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 30),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                    child: Column(
-                      children: [
-                        // Random Ballot option
-                        _buildPayoutOption(
-                          type: PayoutOrderType.random,
-                          title: 'Random Ballot',
-                          description:
-                              'The system will randomly assign the payout order to all accepted members.',
-                          selectedType: selectedType,
-                          onTap: () {
-                            ref
-                                .read(esusuCreationProvider.notifier)
-                                .setPayoutOrderType(PayoutOrderType.random);
-                          },
-                        ),
-                        const SizedBox(height: 12),
-                        // First Come, First Served option
-                        _buildPayoutOption(
-                          type: PayoutOrderType.firstComeFirstServed,
-                          title: 'First Come, First Served',
-                          description:
-                              'Members who accepted the invitation earliest will get to choose their payout order.',
-                          selectedType: selectedType,
-                          onTap: () {
-                            ref
-                                .read(esusuCreationProvider.notifier)
-                                .setPayoutOrderType(
-                                    PayoutOrderType.firstComeFirstServed);
-                          },
-                        ),
-                      ],
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20.0),
+              child: Row(
+                children: [
+                  const AppBackButton(),
+                  const SizedBox(width: 20),
+                  Text(
+                    'Select Payout Order',
+                    style: TextStyle(
+                      fontFamily: AppTextStyles.fontFamily,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 18,
+                      color: Colors.black,
                     ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(20.0),
-                  child: DefaultButton(
-                    isButtonEnabled: !state.isLoading,
-                    onPressed: _showDisclaimerModal,
-                    title: 'Send Invites',
-                    buttonColor: _esusuPrimaryColor,
-                    height: 54,
-                  ),
-                ),
-              ],
+                  )
+                ],
+              ),
             ),
-            // Loading overlay
-            if (state.isLoading)
-              Container(
-                color: Colors.black.withOpacity(0.3),
-                child: const Center(
-                  child: CircularProgressIndicator(
-                    color: _esusuPrimaryColor,
-                  ),
+            const SizedBox(height: 30),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                child: Column(
+                  children: [
+                    // Random Ballot option
+                    _buildPayoutOption(
+                      type: PayoutOrderType.random,
+                      title: 'Random Ballot',
+                      description:
+                          'The system will randomly assign the payout order to all accepted members.',
+                      selectedType: selectedType,
+                      onTap: () {
+                        ref
+                            .read(esusuCreationProvider.notifier)
+                            .setPayoutOrderType(PayoutOrderType.random);
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    // First Come, First Served option
+                    _buildPayoutOption(
+                      type: PayoutOrderType.firstComeFirstServed,
+                      title: 'First Come, First Served',
+                      description:
+                          'Members who accepted the invitation earliest will get to choose their payout order.',
+                      selectedType: selectedType,
+                      onTap: () {
+                        ref
+                            .read(esusuCreationProvider.notifier)
+                            .setPayoutOrderType(
+                                PayoutOrderType.firstComeFirstServed);
+                      },
+                    ),
+                  ],
                 ),
               ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: DefaultButton(
+                isButtonEnabled: true,
+                onPressed: _showDisclaimerModal,
+                title: 'Send Invites',
+                buttonColor: _esusuPrimaryColor,
+                height: 54,
+              ),
+            ),
           ],
         ),
       ),

@@ -362,11 +362,11 @@ class ContributionCommunityMembersResponse {
 
 /// Participant to add to Contribution
 class ContributionParticipant {
-  final String memberId;
+  final String userId;
 
-  ContributionParticipant({required this.memberId});
+  ContributionParticipant({required this.userId});
 
-  Map<String, dynamic> toJson() => {'memberId': memberId};
+  Map<String, dynamic> toJson() => {'userId': userId};
 }
 
 /// Create Contribution Request Model

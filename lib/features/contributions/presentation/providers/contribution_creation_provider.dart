@@ -465,7 +465,7 @@ class ContributionCreationNotifier extends StateNotifier<ContributionCreationSta
         visibility: state.visibility,
         notifyRecipient: state.notifyRecipient,
         participants: state.selectedParticipants
-            .map((m) => ContributionParticipant(memberId: m.id))
+            .map((m) => ContributionParticipant(userId: m.id))
             .toList(),
       );
 

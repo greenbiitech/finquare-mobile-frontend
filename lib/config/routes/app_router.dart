@@ -29,6 +29,17 @@ import 'package:finsquare_mobile_app/features/auth/presentation/pages/reset_pass
 import 'package:finsquare_mobile_app/features/dashboard/presentation/pages/dashboard_page.dart';
 import 'package:finsquare_mobile_app/features/wallet/presentation/pages/activate_wallet_page.dart';
 import 'package:finsquare_mobile_app/features/wallet/presentation/pages/bvn_validation_page.dart';
+import 'package:finsquare_mobile_app/features/wallet/presentation/pages/select_verification_type_page.dart';
+import 'package:finsquare_mobile_app/features/wallet/presentation/pages/nin_validation_page.dart';
+import 'package:finsquare_mobile_app/features/wallet/presentation/pages/wallet_upgrade_page.dart';
+import 'package:finsquare_mobile_app/features/wallet/presentation/pages/upgrade_identity_page.dart';
+import 'package:finsquare_mobile_app/features/wallet/presentation/pages/upgrade_personal_info_page.dart';
+import 'package:finsquare_mobile_app/features/wallet/presentation/pages/upgrade_id_document_page.dart';
+import 'package:finsquare_mobile_app/features/wallet/presentation/pages/upgrade_face_page.dart';
+import 'package:finsquare_mobile_app/features/wallet/presentation/pages/upgrade_address_page.dart';
+import 'package:finsquare_mobile_app/features/wallet/presentation/pages/upgrade_utility_bill_page.dart';
+import 'package:finsquare_mobile_app/features/wallet/presentation/pages/upgrade_signature_page.dart';
+import 'package:finsquare_mobile_app/features/wallet/presentation/pages/upgrade_pending_page.dart';
 import 'package:finsquare_mobile_app/features/wallet/presentation/pages/select_verification_method_page.dart';
 import 'package:finsquare_mobile_app/features/wallet/presentation/pages/verify_bvn_credentials_page.dart';
 import 'package:finsquare_mobile_app/features/wallet/presentation/pages/verify_otp_page.dart';
@@ -42,6 +53,9 @@ import 'package:finsquare_mobile_app/features/wallet/presentation/pages/confirm_
 import 'package:finsquare_mobile_app/features/wallet/presentation/pages/proof_of_address_page.dart';
 import 'package:finsquare_mobile_app/features/wallet/presentation/pages/top_up_page.dart';
 import 'package:finsquare_mobile_app/features/wallet/presentation/pages/withdrawal_success_page.dart';
+import 'package:finsquare_mobile_app/features/wallet/presentation/pages/wallet_transfer_page.dart';
+import 'package:finsquare_mobile_app/features/wallet/presentation/pages/wallet_transfer_amount_page.dart';
+import 'package:finsquare_mobile_app/features/wallet/presentation/pages/transfer_success_page.dart';
 import 'package:finsquare_mobile_app/features/wallet/data/wallet_repository.dart';
 import 'package:finsquare_mobile_app/features/hub/presentation/pages/create_hub_page.dart';
 import 'package:finsquare_mobile_app/features/dues/presentation/pages/dues_welcome_page.dart';
@@ -65,6 +79,17 @@ import 'package:finsquare_mobile_app/features/esusu/presentation/pages/active_es
 import 'package:finsquare_mobile_app/features/esusu/presentation/pages/esusu_invitation_page.dart';
 import 'package:finsquare_mobile_app/features/esusu/presentation/pages/slot_selection_page.dart';
 import 'package:finsquare_mobile_app/features/esusu/presentation/pages/esusu_waiting_room_page.dart';
+import 'package:finsquare_mobile_app/features/esusu/presentation/pages/admin_slot_selection_page.dart';
+import 'package:finsquare_mobile_app/features/notifications/presentation/pages/hub_notifications_page.dart';
+import 'package:finsquare_mobile_app/features/contributions/presentation/pages/contributions_welcome_page.dart';
+import 'package:finsquare_mobile_app/features/contributions/presentation/pages/create_contribution_page.dart';
+import 'package:finsquare_mobile_app/features/contributions/presentation/pages/configure_contribution_page.dart';
+import 'package:finsquare_mobile_app/features/contributions/presentation/pages/add_participants_page.dart';
+import 'package:finsquare_mobile_app/features/contributions/presentation/pages/contribution_success_page.dart';
+import 'package:finsquare_mobile_app/features/contributions/presentation/pages/contributions_list_page.dart';
+import 'package:finsquare_mobile_app/features/contributions/presentation/pages/contribution_detail_page.dart';
+import 'package:finsquare_mobile_app/features/contributions/presentation/pages/contribution_payment_page.dart';
+import 'package:finsquare_mobile_app/features/contributions/presentation/pages/contribution_payment_success_page.dart';
 
 part 'app_router.g.dart';
 
@@ -98,7 +123,9 @@ abstract class AppRoutes {
 
   // Wallet routes
   static const String activateWallet = '/activate-wallet';
+  static const String selectVerificationType = '/select-verification-type';
   static const String bvnValidation = '/bvn-validation';
+  static const String ninValidation = '/nin-validation';
   static const String selectVerificationMethod = '/select-verification-method';
   static const String verifyBvnCredentials = '/verify-bvn-credentials';
   static const String verifyOtp = '/verify-otp';
@@ -114,8 +141,25 @@ abstract class AppRoutes {
   static const String withdraw = '/withdraw';
   static const String withdrawalSuccess = '/withdrawal-success';
 
+  // Wallet Transfer routes
+  static const String walletTransfer = '/wallet-transfer';
+  static const String walletTransferAmount = '/wallet-transfer-amount';
+  static const String transferSuccess = '/transfer-success';
+
+  // Wallet Upgrade routes
+  static const String walletUpgrade = '/wallet-upgrade';
+  static const String upgradeIdentity = '/upgrade-identity';
+  static const String upgradePersonalInfo = '/upgrade-personal-info';
+  static const String upgradeIdDocument = '/upgrade-id-document';
+  static const String upgradeFace = '/upgrade-face';
+  static const String upgradeAddress = '/upgrade-address';
+  static const String upgradeUtilityBill = '/upgrade-utility-bill';
+  static const String upgradeSignature = '/upgrade-signature';
+  static const String upgradePending = '/upgrade-pending';
+
   // Hub routes
   static const String createHub = '/create-hub';
+  static const String hubNotifications = '/hub-notifications';
 
   // Dues routes
   static const String duesWelcome = '/dues-welcome';
@@ -123,6 +167,17 @@ abstract class AppRoutes {
   static const String createNewDues = '/create-new-dues';
   static const String configureDues = '/configure-dues';
   static const String duesSuccess = '/dues-success';
+
+  // Contributions routes
+  static const String contributionsList = '/contributions-list';
+  static const String contributionDetail = '/contribution-detail';
+  static const String contributionPayment = '/contribution-payment';
+  static const String contributionPaymentSuccess = '/contribution-payment-success';
+  static const String contributionsWelcome = '/contributions-welcome';
+  static const String createContribution = '/create-contribution';
+  static const String configureContribution = '/configure-contribution';
+  static const String contributionAddParticipants = '/contribution-add-participants';
+  static const String contributionSuccess = '/contribution-success';
 
   // Esusu routes
   static const String esusuList = '/esusu-list';
@@ -136,6 +191,7 @@ abstract class AppRoutes {
   static const String configureEsusu = '/configure-esusu';
   static const String addParticipants = '/add-participants';
   static const String selectPayoutOrder = '/select-payout-order';
+  static const String adminSlotSelection = '/admin-slot-selection';
   static const String esusuSuccess = '/esusu-success';
 
   // Community management routes
@@ -343,9 +399,19 @@ GoRouter appRouter(Ref ref) {
         builder: (context, state) => const ActivateWalletPage(),
       ),
       GoRoute(
+        path: AppRoutes.selectVerificationType,
+        name: 'selectVerificationType',
+        builder: (context, state) => const SelectVerificationTypePage(),
+      ),
+      GoRoute(
         path: AppRoutes.bvnValidation,
         name: 'bvnValidation',
         builder: (context, state) => const BvnValidationPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.ninValidation,
+        name: 'ninValidation',
+        builder: (context, state) => const NinValidationPage(),
       ),
       GoRoute(
         path: AppRoutes.selectVerificationMethod,
@@ -358,6 +424,7 @@ GoRouter appRouter(Ref ref) {
             methods: methodsList
                 .whereType<BvnMethodOption>()
                 .toList(),
+            isUpgrade: extra?['isUpgrade'] ?? false,
           );
         },
       ),
@@ -369,6 +436,7 @@ GoRouter appRouter(Ref ref) {
           return VerifyBvnCredentialsPage(
             sessionId: extra?['sessionId'] ?? '',
             method: extra?['method'] ?? '',
+            isUpgrade: extra?['isUpgrade'] ?? false,
           );
         },
       ),
@@ -380,6 +448,7 @@ GoRouter appRouter(Ref ref) {
           return VerifyOtpPage(
             sessionId: extra?['sessionId'] ?? '',
             method: extra?['method'] ?? '',
+            isUpgrade: extra?['isUpgrade'] ?? false,
           );
         },
       ),
@@ -441,20 +510,122 @@ GoRouter appRouter(Ref ref) {
       GoRoute(
         path: AppRoutes.createTransactionPin,
         name: 'createTransactionPin',
-        builder: (context, state) => const CreateTransactionPinPage(),
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          return CreateTransactionPinPage(
+            verificationType: extra?['verificationType'] as String?,
+            verificationData: extra?['verificationData'] as Map<String, dynamic>?,
+          );
+        },
       ),
       GoRoute(
         path: AppRoutes.confirmTransactionPin,
         name: 'confirmTransactionPin',
         builder: (context, state) {
-          final firstPin = state.extra as String;
-          return ConfirmTransactionPinPage(firstPin: firstPin);
+          final extra = state.extra;
+          // Handle both old format (String) and new format (Map)
+          if (extra is String) {
+            return ConfirmTransactionPinPage(firstPin: extra);
+          }
+          final extraMap = extra as Map<String, dynamic>?;
+          return ConfirmTransactionPinPage(
+            firstPin: extraMap?['firstPin'] as String? ?? '',
+            verificationType: extraMap?['verificationType'] as String?,
+            verificationData: extraMap?['verificationData'] as Map<String, dynamic>?,
+          );
         },
       ),
       GoRoute(
         path: AppRoutes.walletSuccess,
         name: 'walletSuccess',
-        builder: (context, state) => const WalletSuccessPage(),
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          return WalletSuccessPage(
+            accountNumber: extra?['accountNumber'],
+            accountName: extra?['accountName'],
+          );
+        },
+      ),
+      // Wallet Transfer routes
+      GoRoute(
+        path: AppRoutes.walletTransfer,
+        name: 'walletTransfer',
+        builder: (context, state) => const WalletTransferPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.walletTransferAmount,
+        name: 'walletTransferAmount',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          return WalletTransferAmountPage(
+            recipientUserId: extra?['recipientUserId'] ?? '',
+            recipientName: extra?['recipientName'] ?? '',
+            recipientMaskedEmail: extra?['recipientMaskedEmail'],
+            recipientAvatar: extra?['recipientAvatar'],
+          );
+        },
+      ),
+      GoRoute(
+        path: AppRoutes.transferSuccess,
+        name: 'transferSuccess',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          return TransferSuccessPage(
+            recipientName: extra?['recipientName'] ?? '',
+            amount: extra?['amount'] ?? 0.0,
+          );
+        },
+      ),
+      // Wallet Upgrade routes
+      GoRoute(
+        path: AppRoutes.walletUpgrade,
+        name: 'walletUpgrade',
+        builder: (context, state) => const WalletUpgradePage(),
+      ),
+      GoRoute(
+        path: AppRoutes.upgradeIdentity,
+        name: 'upgradeIdentity',
+        builder: (context, state) => const UpgradeIdentityPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.upgradePersonalInfo,
+        name: 'upgradePersonalInfo',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          return UpgradePersonalInfoPage(
+            bvnData: extra?['bvnData'] as Map<String, dynamic>?,
+          );
+        },
+      ),
+      GoRoute(
+        path: AppRoutes.upgradeIdDocument,
+        name: 'upgradeIdDocument',
+        builder: (context, state) => const UpgradeIdDocumentPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.upgradeFace,
+        name: 'upgradeFace',
+        builder: (context, state) => const UpgradeFacePage(),
+      ),
+      GoRoute(
+        path: AppRoutes.upgradeAddress,
+        name: 'upgradeAddress',
+        builder: (context, state) => const UpgradeAddressPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.upgradeUtilityBill,
+        name: 'upgradeUtilityBill',
+        builder: (context, state) => const UpgradeUtilityBillPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.upgradeSignature,
+        name: 'upgradeSignature',
+        builder: (context, state) => const UpgradeSignaturePage(),
+      ),
+      GoRoute(
+        path: AppRoutes.upgradePending,
+        name: 'upgradePending',
+        builder: (context, state) => const UpgradePendingPage(),
       ),
       GoRoute(
         path: AppRoutes.topUp,
@@ -471,6 +642,14 @@ GoRouter appRouter(Ref ref) {
         path: AppRoutes.createHub,
         name: 'createHub',
         builder: (context, state) => const CreateHubPage(),
+      ),
+      GoRoute(
+        path: '${AppRoutes.hubNotifications}/:communityId',
+        name: 'hubNotifications',
+        builder: (context, state) {
+          final communityId = state.pathParameters['communityId'] ?? '';
+          return HubNotificationsPage(communityId: communityId);
+        },
       ),
       // Dues routes
       GoRoute(
@@ -503,6 +682,90 @@ GoRouter appRouter(Ref ref) {
           final dueData = state.extra as DueCreationData?;
           return DuesSuccessPage(dueData: dueData);
         },
+      ),
+      // Contributions routes
+      GoRoute(
+        path: AppRoutes.contributionsList,
+        name: 'contributionsList',
+        builder: (context, state) => const ContributionsListPage(),
+      ),
+      GoRoute(
+        path: '${AppRoutes.contributionDetail}/:contributionId',
+        name: 'contributionDetail',
+        builder: (context, state) {
+          final contributionId = state.pathParameters['contributionId'] ?? '';
+          final contributionName = state.uri.queryParameters['name'] ?? 'Contribution';
+          final extra = state.extra as Map<String, dynamic>?;
+          return ContributionDetailPage(
+            contributionId: contributionId,
+            contributionName: contributionName,
+            contributionType: extra?['contributionType'] ?? PaymentContributionType.flexible,
+            recipientName: extra?['recipientName'] ?? '',
+            fixedAmount: extra?['fixedAmount'],
+            targetAmount: extra?['targetAmount'],
+            contributedSoFar: extra?['contributedSoFar'],
+          );
+        },
+      ),
+      GoRoute(
+        path: AppRoutes.contributionPayment,
+        name: 'contributionPayment',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          return ContributionPaymentPage(
+            contributionId: extra?['contributionId'] ?? '',
+            contributionName: extra?['contributionName'] ?? 'Contribution',
+            recipientName: extra?['recipientName'] ?? '',
+            amount: extra?['amount'] ?? 0.0,
+            contributionType: extra?['contributionType'] ?? PaymentContributionType.fixed,
+            contributedSoFar: extra?['contributedSoFar'],
+          );
+        },
+      ),
+      GoRoute(
+        path: AppRoutes.contributionPaymentSuccess,
+        name: 'contributionPaymentSuccess',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          return ContributionPaymentSuccessPage(
+            contributionName: extra?['contributionName'] ?? 'Contribution',
+            recipientName: extra?['recipientName'] ?? '',
+            amount: extra?['amount'] ?? 0.0,
+          );
+        },
+      ),
+      GoRoute(
+        path: AppRoutes.contributionsWelcome,
+        name: 'contributionsWelcome',
+        builder: (context, state) => const ContributionsWelcomePage(),
+      ),
+      GoRoute(
+        path: AppRoutes.createContribution,
+        name: 'createContribution',
+        builder: (context, state) => const CreateContributionPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.configureContribution,
+        name: 'configureContribution',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          return ConfigureContributionPage(
+            contributionType: extra?['contributionType'] as ContributionType?,
+            contributionName: extra?['contributionName'] as String?,
+            contributionDescription: extra?['contributionDescription'] as String?,
+            imagePath: extra?['imagePath'] as String?,
+          );
+        },
+      ),
+      GoRoute(
+        path: AppRoutes.contributionAddParticipants,
+        name: 'contributionAddParticipants',
+        builder: (context, state) => const ContributionAddParticipantsPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.contributionSuccess,
+        name: 'contributionSuccess',
+        builder: (context, state) => const ContributionSuccessPage(),
       ),
       // Esusu routes
       GoRoute(
@@ -580,6 +843,11 @@ GoRouter appRouter(Ref ref) {
         path: AppRoutes.selectPayoutOrder,
         name: 'selectPayoutOrder',
         builder: (context, state) => const SelectPayoutOrderPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.adminSlotSelection,
+        name: 'adminSlotSelection',
+        builder: (context, state) => const AdminSlotSelectionPage(),
       ),
       GoRoute(
         path: AppRoutes.esusuSuccess,

@@ -1,5 +1,8 @@
 /// API Configuration
 class ApiConfig {
+  // Local development URL (10.0.2.2 for Android Emulator -> host localhost)
+  // static const String baseUrl = 'http://10.0.2.2:3000/api/v1';
+
   // Production API URL
   static const String baseUrl = 'https://api.thegreencard.app/api/v1';
 
@@ -124,11 +127,36 @@ class ApiEndpoints {
   static const String walletResolveAccount = '/wallet/resolve-account';
   static const String walletWithdraw = '/wallet/withdraw';
   static const String walletTransfer = '/wallet/transfer';
+  static const String walletLookupRecipient = '/wallet/lookup-recipient';
+  static const String walletInternalTransfer = '/wallet/internal-transfer';
 
   // BVN Validation
   static const String bvnInitiate = '/wallet/bvn/initiate';
   static const String bvnVerify = '/wallet/bvn/verify';
   static const String bvnDetails = '/wallet/bvn/details';
+
+  // NIN Validation (Tier 1)
+  static const String ninLookup = '/wallet/nin/lookup';
+
+  // Tier-based Wallet Creation
+  static const String walletTier1Complete = '/wallet/tier1/complete';
+
+  // Wallet Upgrade (Tier 2/3)
+  static const String upgradeStatus = '/wallet/upgrade/status';
+  static const String upgradeStart = '/wallet/upgrade/start';
+  static const String upgradeIdentity = '/wallet/upgrade/identity';
+  static const String upgradePersonalInfo = '/wallet/upgrade/personal-info';
+  static const String upgradeIdDocument = '/wallet/upgrade/id-document';
+  static const String upgradeFace = '/wallet/upgrade/face';
+  static const String upgradeAddress = '/wallet/upgrade/address';
+  static const String upgradeUtilityBill = '/wallet/upgrade/utility-bill';
+  static const String upgradeSignature = '/wallet/upgrade/signature';
+  static const String upgradeCancel = '/wallet/upgrade/cancel';
+
+  // Upgrade BVN Validation (with OTP)
+  static const String upgradeBvnInitiate = '/wallet/upgrade/bvn/initiate';
+  static const String upgradeBvnVerify = '/wallet/upgrade/bvn/verify';
+  static const String upgradeBvnDetails = '/wallet/upgrade/bvn/details';
 
   // Debug Endpoints (for testing deposit flow)
   static const String walletWebhookLogs = '/wallet/webhook-logs';
@@ -178,4 +206,38 @@ class ApiEndpoints {
 
   /// Get waiting room details: /esusu/{esusuId}/waiting-room
   static String esusuWaitingRoom(String esusuId) => '/esusu/$esusuId/waiting-room';
+
+  /// Send reminders to pending participants: /esusu/{esusuId}/remind
+  static String esusuRemind(String esusuId) => '/esusu/$esusuId/remind';
+
+  // Contributions
+  static const String contributions = '/contributions';
+
+  /// Check Contribution creation eligibility: /contributions/{communityId}/eligibility
+  static String contributionEligibility(String communityId) =>
+      '/contributions/$communityId/eligibility';
+
+  /// Get community members for participant selection: /contributions/{communityId}/members
+  static String contributionCommunityMembers(String communityId) =>
+      '/contributions/$communityId/members';
+
+  /// Get Contribution count for Hub display: /contributions/hub-count/{communityId}
+  static String contributionHubCount(String communityId) =>
+      '/contributions/hub-count/$communityId';
+
+  /// Get Contribution list: /contributions/list/{communityId}
+  static String contributionList(String communityId) =>
+      '/contributions/list/$communityId';
+
+  /// Get pending invitations: /contributions/invitations/{communityId}
+  static String contributionPendingInvitations(String communityId) =>
+      '/contributions/invitations/$communityId';
+
+  /// Get Contribution details: /contributions/{contributionId}
+  static String contributionDetails(String contributionId) =>
+      '/contributions/$contributionId';
+
+  /// Respond to Contribution invitation: /contributions/{contributionId}/respond
+  static String contributionRespondInvitation(String contributionId) =>
+      '/contributions/$contributionId/respond';
 }

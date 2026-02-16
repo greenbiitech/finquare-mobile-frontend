@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:finsquare_mobile_app/config/theme/app_theme.dart';
+import 'package:finsquare_mobile_app/features/contributions/data/contributions_repository.dart';
+import 'package:finsquare_mobile_app/features/wallet/presentation/providers/wallet_provider.dart';
 
 const Color _contributionPrimary = Color(0xFFF83181);
 const Color _contributionLight = Color(0xFFFFE0ED);
@@ -37,6 +39,8 @@ class _ContributionPinModalState extends ConsumerState<ContributionPinModal> {
   String _pin = '';
   bool _isProcessing = false;
   String? _error;
+  int _failedAttempts = 0;
+  static const int _maxAttempts = 3;
 
   void _addDigit(String digit) {
     if (_pin.length < 4) {
@@ -59,32 +63,129 @@ class _ContributionPinModalState extends ConsumerState<ContributionPinModal> {
   Future<void> _processPayment() async {
     if (_pin.length != 4 || _isProcessing) return;
 
+    // Check if locked out
+    if (_failedAttempts >= _maxAttempts) {
+      setState(() {
+        _error = 'Too many failed attempts. Please try again later.';
+      });
+      return;
+    }
+
     setState(() {
       _isProcessing = true;
       _error = null;
     });
 
-    // Simulate API call delay (dummy implementation)
-    await Future.delayed(const Duration(seconds: 2));
+    try {
+      final repository = ref.read(contributionsRepositoryProvider);
+      final response = await repository.makeContribution(
+        widget.contributionId,
+        amount: widget.amount,
+        transactionPin: _pin,
+        narration: widget.narration,
+      );
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    // For dummy implementation, accept PIN "1234" as valid
-    if (_pin == '1234') {
-      Navigator.of(context).pop();
-      widget.onSuccess();
-    } else {
+      if (response.success) {
+        // Refresh wallet balance
+        ref.read(walletProvider.notifier).refreshBalance();
+
+        // Refresh contribution list
+        ref.read(contributionListRefreshTriggerProvider.notifier).state++;
+
+        Navigator.of(context).pop();
+        widget.onSuccess();
+      } else {
+        _failedAttempts++;
+        final remainingAttempts = _maxAttempts - _failedAttempts;
+        setState(() {
+          _isProcessing = false;
+          _error = remainingAttempts > 0
+              ? '${response.message}. $remainingAttempts attempt(s) remaining.'
+              : 'Too many failed attempts. Please try again later.';
+          _pin = '';
+        });
+
+        // Close modal if locked out
+        if (_failedAttempts >= _maxAttempts) {
+          await Future.delayed(const Duration(seconds: 2));
+          if (mounted) Navigator.of(context).pop();
+        }
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      final errorMessage = e.toString();
+
+      // Check if it's a PIN error
+      final isPinError = errorMessage.toLowerCase().contains('pin') ||
+          errorMessage.toLowerCase().contains('incorrect') ||
+          errorMessage.toLowerCase().contains('invalid');
+
+      if (isPinError) {
+        _failedAttempts++;
+      }
+
+      final remainingAttempts = _maxAttempts - _failedAttempts;
       setState(() {
         _isProcessing = false;
-        _error = 'Invalid PIN. Try 1234 for demo.';
+        _error = _failedAttempts >= _maxAttempts
+            ? 'Too many failed attempts. Please try again later.'
+            : isPinError && remainingAttempts > 0
+                ? 'Invalid PIN. $remainingAttempts attempt(s) remaining.'
+                : _extractErrorMessage(errorMessage);
         _pin = '';
       });
+
+      // Close modal if locked out
+      if (_failedAttempts >= _maxAttempts) {
+        await Future.delayed(const Duration(seconds: 2));
+        if (mounted) Navigator.of(context).pop();
+      }
     }
   }
 
-  void _onForgotPin() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Forgot PIN flow coming soon')),
+  String _extractErrorMessage(String error) {
+    // Try to extract meaningful message from error
+    if (error.contains('Exception:')) {
+      return error.split('Exception:').last.trim();
+    }
+    if (error.contains('message:')) {
+      final match = RegExp(r'message:\s*([^,}]+)').firstMatch(error);
+      if (match != null) return match.group(1)?.trim() ?? 'Payment failed';
+    }
+    return 'Payment failed. Please try again.';
+  }
+
+  void _showForgotPinDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(
+          'Forgot PIN?',
+          style: TextStyle(
+            fontFamily: AppTextStyles.fontFamily,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        content: Text(
+          'To reset your transaction PIN, please go to Settings > Security > Reset Transaction PIN.',
+          style: TextStyle(fontFamily: AppTextStyles.fontFamily),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(
+              'OK',
+              style: TextStyle(
+                fontFamily: AppTextStyles.fontFamily,
+                color: _contributionPrimary,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -186,7 +287,7 @@ class _ContributionPinModalState extends ConsumerState<ContributionPinModal> {
 
               // Forgot PIN
               TextButton(
-                onPressed: _onForgotPin,
+                onPressed: _showForgotPinDialog,
                 child: Text(
                   'Forgot pin',
                   style: TextStyle(
@@ -208,6 +309,35 @@ class _ContributionPinModalState extends ConsumerState<ContributionPinModal> {
                       fontSize: 13,
                       color: Colors.red,
                     ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+
+              // Processing indicator
+              if (_isProcessing)
+                Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: _contributionPrimary,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Processing payment...',
+                        style: TextStyle(
+                          fontFamily: AppTextStyles.fontFamily,
+                          fontSize: 12,
+                          color: _greyTextColor,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
 

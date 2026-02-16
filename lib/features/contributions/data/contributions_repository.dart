@@ -957,4 +957,64 @@ class ContributionsRepository {
     );
     return ContributionInvitationResponse.fromJson(response.data, accept);
   }
+
+  /// Make a contribution payment
+  Future<MakeContributionResponse> makeContribution(
+    String contributionId, {
+    required double amount,
+    required String transactionPin,
+    String? narration,
+  }) async {
+    final response = await _apiClient.post(
+      ApiEndpoints.contributionContribute(contributionId),
+      data: {
+        'amount': amount,
+        'transactionPin': transactionPin,
+        if (narration != null && narration.isNotEmpty) 'narration': narration,
+      },
+    );
+    return MakeContributionResponse.fromJson(response.data);
+  }
+}
+
+// =====================================================
+// MAKE CONTRIBUTION RESPONSE MODEL
+// =====================================================
+
+/// Response from making a contribution payment
+class MakeContributionResponse {
+  final bool success;
+  final String message;
+  final String? entryId;
+  final String? contributionId;
+  final String? contributionName;
+  final double? amount;
+  final String? transactionRef;
+  final String? recipientName;
+
+  MakeContributionResponse({
+    required this.success,
+    required this.message,
+    this.entryId,
+    this.contributionId,
+    this.contributionName,
+    this.amount,
+    this.transactionRef,
+    this.recipientName,
+  });
+
+  factory MakeContributionResponse.fromJson(Map<String, dynamic> json) {
+    final data = json['data'] as Map<String, dynamic>?;
+
+    return MakeContributionResponse(
+      success: json['success'] ?? false,
+      message: json['message'] ?? '',
+      entryId: data?['entryId'],
+      contributionId: data?['contributionId'],
+      contributionName: data?['contributionName'],
+      amount: data?['amount'] != null ? (data!['amount']).toDouble() : null,
+      transactionRef: data?['transactionRef'],
+      recipientName: data?['recipientName'],
+    );
+  }
 }

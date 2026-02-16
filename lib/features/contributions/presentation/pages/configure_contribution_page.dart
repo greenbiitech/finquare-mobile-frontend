@@ -7,28 +7,13 @@ import 'package:finsquare_mobile_app/config/routes/app_router.dart';
 import 'package:finsquare_mobile_app/config/theme/app_theme.dart';
 import 'package:finsquare_mobile_app/core/widgets/back_button.dart';
 import 'package:finsquare_mobile_app/core/widgets/custom_text_field.dart';
+import 'package:finsquare_mobile_app/features/contributions/data/contributions_repository.dart';
 import 'package:finsquare_mobile_app/features/contributions/presentation/providers/contribution_creation_provider.dart';
 import 'package:finsquare_mobile_app/features/contributions/presentation/pages/create_contribution_page.dart'
     as create_page;
 
 // Contribution brand colors
 const Color _contributionPrimary = Color(0xFFF83181);
-
-class RecipientModel {
-  final String id;
-  final String name;
-  final String subtitle;
-  final String? avatarUrl;
-  final bool isCommunityWallet;
-
-  RecipientModel({
-    required this.id,
-    required this.name,
-    required this.subtitle,
-    this.avatarUrl,
-    this.isCommunityWallet = false,
-  });
-}
 
 class ConfigureContributionPage extends ConsumerStatefulWidget {
   final create_page.ContributionType? contributionType;
@@ -54,66 +39,27 @@ class _ConfigureContributionPageState
   final TextEditingController _amountController = TextEditingController();
   DateTime? _startDate;
   DateTime? _deadline;
-  RecipientModel? _selectedRecipient;
+
+  // Recipient selection
+  bool _isCommunityWalletSelected = true;
+  ContributionCommunityMember? _selectedMember;
+
   ParticipantVisibility _visibility = ParticipantVisibility.viewAll;
   bool _notifyRecipient = false;
-
-  // Mock data for members - in real app, fetch from provider/repository
-  final List<RecipientModel> _members = [
-    RecipientModel(
-      id: 'community_wallet',
-      name: 'Community Wallet',
-      subtitle: 'Default',
-      isCommunityWallet: true,
-    ),
-    RecipientModel(
-      id: '1',
-      name: 'Joy Jones',
-      subtitle: 'Joy@gmail.com',
-      avatarUrl: null,
-    ),
-    RecipientModel(
-      id: '2',
-      name: 'Michael Smith',
-      subtitle: 'Michael@gmail.com',
-      avatarUrl: null,
-    ),
-    RecipientModel(
-      id: '3',
-      name: 'Emily Davis',
-      subtitle: 'Emily@gmail.com',
-      avatarUrl: null,
-    ),
-    RecipientModel(
-      id: '4',
-      name: 'David Brown',
-      subtitle: 'David@gmail.com',
-      avatarUrl: null,
-    ),
-    RecipientModel(
-      id: '5',
-      name: 'Sarah Wilson',
-      subtitle: 'Sarah@gmail.com',
-      avatarUrl: null,
-    ),
-  ];
 
   @override
   void initState() {
     super.initState();
-    // Default to community wallet
-    _selectedRecipient = _members.first;
 
-    // Set the contribution type and basic info in the provider
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _setTypeInProvider();
       _setBasicInfoInProvider();
+      _loadMembers();
     });
   }
 
   void _setTypeInProvider() {
     final notifier = ref.read(contributionCreationProvider.notifier);
-    // Map the UI contribution type to the API contribution type
     switch (widget.contributionType) {
       case create_page.ContributionType.fixedAmount:
         notifier.setType(ContributionType.fixed);
@@ -142,6 +88,10 @@ class _ConfigureContributionPageState
     }
   }
 
+  Future<void> _loadMembers() async {
+    await ref.read(contributionCreationProvider.notifier).loadCommunityMembers();
+  }
+
   @override
   void dispose() {
     _amountController.dispose();
@@ -149,17 +99,14 @@ class _ConfigureContributionPageState
   }
 
   bool get _isFormValid {
-    // For Flexible type, no amount is required
     if (widget.contributionType == create_page.ContributionType.flexible) {
-      return _startDate != null && _selectedRecipient != null;
+      return _startDate != null && (_isCommunityWalletSelected || _selectedMember != null);
     }
-    // For Fixed and Target types, amount is required
     return _amountController.text.trim().isNotEmpty &&
         _startDate != null &&
-        _selectedRecipient != null;
+        (_isCommunityWalletSelected || _selectedMember != null);
   }
 
-  /// Returns the appropriate label for the amount field based on contribution type
   String get _amountFieldLabel {
     switch (widget.contributionType) {
       case create_page.ContributionType.fixedAmount:
@@ -172,7 +119,6 @@ class _ConfigureContributionPageState
     }
   }
 
-  /// Returns the description text for the amount field
   String get _amountFieldDescription {
     switch (widget.contributionType) {
       case create_page.ContributionType.fixedAmount:
@@ -185,7 +131,6 @@ class _ConfigureContributionPageState
     }
   }
 
-  /// Whether to show the amount field (not shown for Flexible type)
   bool get _showAmountField {
     return widget.contributionType != create_page.ContributionType.flexible;
   }
@@ -223,8 +168,11 @@ class _ConfigureContributionPageState
   }
 
   void _showRecipientModal() {
+    final state = ref.read(contributionCreationProvider);
+    final eligibleMembers = state.eligibleMembers;
+
     final TextEditingController searchController = TextEditingController();
-    List<RecipientModel> filteredMembers = List.from(_members);
+    List<ContributionCommunityMember> filteredMembers = List.from(eligibleMembers);
 
     showModalBottomSheet(
       context: context,
@@ -253,7 +201,7 @@ class _ConfigureContributionPageState
               ),
               const SizedBox(height: 24),
               Text(
-                'Select Member',
+                'Select Recipient',
                 style: TextStyle(
                   fontFamily: AppTextStyles.fontFamily,
                   fontSize: 18,
@@ -287,8 +235,8 @@ class _ConfigureContributionPageState
                         ),
                         onChanged: (value) {
                           setModalState(() {
-                            filteredMembers = _members
-                                .where((m) => m.name
+                            filteredMembers = eligibleMembers
+                                .where((m) => m.fullName
                                     .toLowerCase()
                                     .contains(value.toLowerCase()))
                                 .toList();
@@ -300,16 +248,37 @@ class _ConfigureContributionPageState
                 ),
               ),
               const SizedBox(height: 16),
+              // Community Wallet option (always first)
+              _buildCommunityWalletItem(setModalState),
+              const Divider(height: 1),
+              const SizedBox(height: 8),
               // Member list
               Expanded(
-                child: ListView.separated(
-                  itemCount: filteredMembers.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
-                  itemBuilder: (context, index) {
-                    final member = filteredMembers[index];
-                    return _buildMemberItem(member);
-                  },
-                ),
+                child: state.isLoading
+                    ? const Center(
+                        child: CircularProgressIndicator(
+                          color: _contributionPrimary,
+                        ),
+                      )
+                    : filteredMembers.isEmpty
+                        ? Center(
+                            child: Text(
+                              'No eligible members found',
+                              style: TextStyle(
+                                fontFamily: AppTextStyles.fontFamily,
+                                fontSize: 14,
+                                color: const Color(0xFF606060),
+                              ),
+                            ),
+                          )
+                        : ListView.separated(
+                            itemCount: filteredMembers.length,
+                            separatorBuilder: (_, __) => const Divider(height: 1),
+                            itemBuilder: (context, index) {
+                              final member = filteredMembers[index];
+                              return _buildMemberItem(member);
+                            },
+                          ),
               ),
             ],
           ),
@@ -318,51 +287,27 @@ class _ConfigureContributionPageState
     );
   }
 
-  Widget _buildMemberItem(RecipientModel member) {
+  Widget _buildCommunityWalletItem(StateSetter setModalState) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
       child: Row(
         children: [
-          // Avatar
           Container(
             width: 48,
             height: 48,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: member.isCommunityWallet
-                  ? Colors.grey[200]
-                  : _getAvatarColor(member.name),
+              color: Colors.grey[200],
             ),
-            child: member.avatarUrl != null
-                ? ClipOval(
-                    child: Image.network(
-                      member.avatarUrl!,
-                      fit: BoxFit.cover,
-                    ),
-                  )
-                : Center(
-                    child: member.isCommunityWallet
-                        ? const Icon(Icons.account_balance_wallet,
-                            color: Colors.grey)
-                        : Text(
-                            member.name.substring(0, 1).toUpperCase(),
-                            style: TextStyle(
-                              fontFamily: AppTextStyles.fontFamily,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                            ),
-                          ),
-                  ),
+            child: const Icon(Icons.account_balance_wallet, color: Colors.grey),
           ),
           const SizedBox(width: 12),
-          // Name and subtitle
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  member.name,
+                  'Community Wallet',
                   style: TextStyle(
                     fontFamily: AppTextStyles.fontFamily,
                     fontSize: 16,
@@ -371,7 +316,7 @@ class _ConfigureContributionPageState
                   ),
                 ),
                 Text(
-                  member.subtitle,
+                  'Default recipient',
                   style: TextStyle(
                     fontFamily: AppTextStyles.fontFamily,
                     fontSize: 14,
@@ -382,15 +327,16 @@ class _ConfigureContributionPageState
               ],
             ),
           ),
-          // Select button
           OutlinedButton(
             onPressed: () {
               setState(() {
-                _selectedRecipient = member;
+                _isCommunityWalletSelected = true;
+                _selectedMember = null;
               });
               Navigator.pop(context);
             },
             style: OutlinedButton.styleFrom(
+              backgroundColor: _isCommunityWalletSelected ? _contributionPrimary : null,
               side: const BorderSide(color: _contributionPrimary),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
@@ -400,18 +346,135 @@ class _ConfigureContributionPageState
               minimumSize: Size.zero,
             ),
             child: Text(
-              'Select',
+              _isCommunityWalletSelected ? 'Selected' : 'Select',
               style: TextStyle(
                 fontFamily: AppTextStyles.fontFamily,
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
-                color: _contributionPrimary,
+                color: _isCommunityWalletSelected ? Colors.white : _contributionPrimary,
               ),
             ),
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildMemberItem(ContributionCommunityMember member) {
+    final isSelected = !_isCommunityWalletSelected && _selectedMember?.id == member.id;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 24,
+            backgroundColor: _getAvatarColor(member.fullName),
+            backgroundImage: member.photo != null ? NetworkImage(member.photo!) : null,
+            child: member.photo == null
+                ? Text(
+                    _getInitials(member.fullName),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  )
+                : null,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        member.isCurrentUser ? '${member.fullName} (You)' : member.fullName,
+                        style: TextStyle(
+                          fontFamily: AppTextStyles.fontFamily,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (member.isAdmin) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: _contributionPrimary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          'Admin',
+                          style: TextStyle(
+                            fontFamily: AppTextStyles.fontFamily,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                            color: _contributionPrimary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                Text(
+                  member.email,
+                  style: TextStyle(
+                    fontFamily: AppTextStyles.fontFamily,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w400,
+                    color: const Color(0xFF9E9E9E),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          OutlinedButton(
+            onPressed: () {
+              setState(() {
+                _isCommunityWalletSelected = false;
+                _selectedMember = member;
+              });
+              Navigator.pop(context);
+            },
+            style: OutlinedButton.styleFrom(
+              backgroundColor: isSelected ? _contributionPrimary : null,
+              side: const BorderSide(color: _contributionPrimary),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              minimumSize: Size.zero,
+            ),
+            child: Text(
+              isSelected ? 'Selected' : 'Select',
+              style: TextStyle(
+                fontFamily: AppTextStyles.fontFamily,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: isSelected ? Colors.white : _contributionPrimary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _getInitials(String name) {
+    if (name.isEmpty) return '?';
+    final parts = name.trim().split(' ').where((p) => p.isNotEmpty).toList();
+    if (parts.isEmpty) return '?';
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    }
+    return parts[0][0].toUpperCase();
   }
 
   Color _getAvatarColor(String name) {
@@ -518,13 +581,11 @@ class _ConfigureContributionPageState
     }
 
     // Save recipient
-    if (_selectedRecipient != null) {
-      if (_selectedRecipient!.isCommunityWallet) {
-        notifier.setRecipientType(RecipientType.communityWallet);
-      } else {
-        notifier.setRecipientType(RecipientType.member);
-        notifier.setRecipient(_selectedRecipient!.id, _selectedRecipient!.name);
-      }
+    if (_isCommunityWalletSelected) {
+      notifier.setRecipientType(RecipientType.communityWallet);
+    } else if (_selectedMember != null) {
+      notifier.setRecipientType(RecipientType.member);
+      notifier.setRecipient(_selectedMember!.id, _selectedMember!.fullName);
     }
 
     // Save visibility
@@ -539,6 +600,8 @@ class _ConfigureContributionPageState
 
   @override
   Widget build(BuildContext context) {
+    final state = ref.watch(contributionCreationProvider);
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -621,7 +684,7 @@ class _ConfigureContributionPageState
                         ),
                       ),
                       const SizedBox(height: 8),
-                      _buildRecipientDropdown(),
+                      _buildRecipientDropdown(state),
                       const SizedBox(height: 24),
 
                       // Participants can
@@ -637,9 +700,8 @@ class _ConfigureContributionPageState
                       const SizedBox(height: 8),
                       _buildVisibilityDropdown(),
 
-                      // Notify recipient checkbox (only show if recipient is not community wallet)
-                      if (_selectedRecipient != null &&
-                          !_selectedRecipient!.isCommunityWallet) ...[
+                      // Notify recipient checkbox (only show if recipient is a member)
+                      if (!_isCommunityWalletSelected && _selectedMember != null) ...[
                         const SizedBox(height: 24),
                         Row(
                           children: [
@@ -759,7 +821,7 @@ class _ConfigureContributionPageState
     );
   }
 
-  Widget _buildRecipientDropdown() {
+  Widget _buildRecipientDropdown(ContributionCreationState state) {
     return GestureDetector(
       onTap: _showRecipientModal,
       child: Container(
@@ -771,27 +833,49 @@ class _ConfigureContributionPageState
         ),
         child: Row(
           children: [
-            if (_selectedRecipient != null &&
-                !_selectedRecipient!.isCommunityWallet) ...[
-              // Show avatar for non-community wallet
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: _getAvatarColor(_selectedRecipient!.name),
-                ),
-                child: Center(
-                  child: Text(
-                    _selectedRecipient!.name.substring(0, 1).toUpperCase(),
-                    style: TextStyle(
-                      fontFamily: AppTextStyles.fontFamily,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
+            if (_isCommunityWalletSelected) ...[
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.grey[300],
+                      ),
+                      child: const Icon(Icons.account_balance_wallet, color: Colors.grey, size: 20),
                     ),
-                  ),
+                    const SizedBox(width: 12),
+                    Text(
+                      'Community Wallet',
+                      style: TextStyle(
+                        fontFamily: AppTextStyles.fontFamily,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w400,
+                        color: Colors.black,
+                      ),
+                    ),
+                  ],
                 ),
+              ),
+            ] else if (_selectedMember != null) ...[
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: _getAvatarColor(_selectedMember!.fullName),
+                backgroundImage: _selectedMember!.photo != null
+                    ? NetworkImage(_selectedMember!.photo!)
+                    : null,
+                child: _selectedMember!.photo == null
+                    ? Text(
+                        _getInitials(_selectedMember!.fullName),
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      )
+                    : null,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -799,7 +883,7 @@ class _ConfigureContributionPageState
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      _selectedRecipient!.name,
+                      _selectedMember!.fullName,
                       style: TextStyle(
                         fontFamily: AppTextStyles.fontFamily,
                         fontSize: 14,
@@ -808,7 +892,7 @@ class _ConfigureContributionPageState
                       ),
                     ),
                     Text(
-                      _selectedRecipient!.subtitle,
+                      _selectedMember!.email,
                       style: TextStyle(
                         fontFamily: AppTextStyles.fontFamily,
                         fontSize: 12,
@@ -822,19 +906,27 @@ class _ConfigureContributionPageState
             ] else ...[
               Expanded(
                 child: Text(
-                  _selectedRecipient?.name ?? 'Select',
+                  'Select recipient',
                   style: TextStyle(
                     fontFamily: AppTextStyles.fontFamily,
                     fontSize: 14,
                     fontWeight: FontWeight.w400,
-                    color: _selectedRecipient != null
-                        ? Colors.black
-                        : const Color(0xFF9E9E9E),
+                    color: const Color(0xFF9E9E9E),
                   ),
                 ),
               ),
             ],
-            const Icon(Icons.keyboard_arrow_down, color: Colors.black),
+            if (state.isLoading)
+              const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: _contributionPrimary,
+                ),
+              )
+            else
+              const Icon(Icons.keyboard_arrow_down, color: Colors.black),
           ],
         ),
       ),

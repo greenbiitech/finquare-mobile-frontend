@@ -5,97 +5,23 @@ import 'package:go_router/go_router.dart';
 import 'package:finsquare_mobile_app/config/routes/app_router.dart';
 import 'package:finsquare_mobile_app/config/theme/app_theme.dart';
 import 'package:finsquare_mobile_app/core/widgets/back_button.dart';
-import 'package:finsquare_mobile_app/features/contributions/presentation/pages/contribution_payment_page.dart';
+import 'package:finsquare_mobile_app/features/community/presentation/providers/community_provider.dart';
+import 'package:finsquare_mobile_app/features/contributions/data/contributions_repository.dart';
 
 const Color _contributionPrimary = Color(0xFFF83181);
 const Color _contributionLight = Color(0xFFFFE0ED);
 
-/// Mock contribution model for list display
-class _MockContribution {
-  final String id;
-  final String name;
-  final String? imageUrl;
-  final String recipientName;
-  final String? recipientPhotoUrl;
-  final String status; // 'active', 'completed', 'cancelled'
-  final String secondaryTag; // e.g., "Flexible payments", "₦5,000 person"
-  final double progress; // 0.0 to 1.0
-  final int daysLeft;
-  final bool isArchived;
-  final PaymentContributionType contributionType;
-  final double? fixedAmount; // For fixed type
-  final double? targetAmount; // For target type
-  final double? contributedSoFar; // For target type
+/// Provider for fetching contribution list
+final contributionListProvider = FutureProvider.autoDispose
+    .family<ContributionListResponse, ({String communityId, bool archived})>(
+        (ref, params) async {
+  // Watch the refresh trigger to refetch when it changes
+  ref.watch(contributionListRefreshTriggerProvider);
 
-  const _MockContribution({
-    required this.id,
-    required this.name,
-    this.imageUrl,
-    required this.recipientName,
-    this.recipientPhotoUrl,
-    required this.status,
-    required this.secondaryTag,
-    required this.progress,
-    required this.daysLeft,
-    this.isArchived = false,
-    required this.contributionType,
-    this.fixedAmount,
-    this.targetAmount,
-    this.contributedSoFar,
-  });
-}
-
-/// Mock data for contributions
-final List<_MockContribution> _mockContributions = [
-  const _MockContribution(
-    id: '1',
-    name: "Kemi's Wedding",
-    imageUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200',
-    recipientName: 'Kemi Falana',
-    status: 'active',
-    secondaryTag: 'Flexible payments',
-    progress: 0.4,
-    daysLeft: 20,
-    contributionType: PaymentContributionType.flexible,
-  ),
-  const _MockContribution(
-    id: '2',
-    name: 'Cooperative Hangout',
-    recipientName: 'Cooperative wallet',
-    status: 'active',
-    secondaryTag: '₦5,000 person',
-    progress: 0.5,
-    daysLeft: 20,
-    contributionType: PaymentContributionType.fixed,
-    fixedAmount: 5000,
-  ),
-  const _MockContribution(
-    id: '3',
-    name: "John's Surgery",
-    recipientName: 'John Ifunanya',
-    status: 'active',
-    secondaryTag: '₦200,000 target',
-    progress: 0.6,
-    daysLeft: 20,
-    contributionType: PaymentContributionType.target,
-    targetAmount: 200000,
-    contributedSoFar: 120000,
-  ),
-  // Archived contributions
-  const _MockContribution(
-    id: '4',
-    name: "Sarah's Birthday",
-    recipientName: 'Sarah Adams',
-    status: 'completed',
-    secondaryTag: '₦50,000 target',
-    progress: 1.0,
-    daysLeft: 0,
-    isArchived: true,
-    contributionType: PaymentContributionType.target,
-    targetAmount: 50000,
-    contributedSoFar: 50000,
-  ),
-];
+  final repository = ref.watch(contributionsRepositoryProvider);
+  return repository.getContributionList(params.communityId,
+      archived: params.archived);
+});
 
 class ContributionsListPage extends ConsumerStatefulWidget {
   const ContributionsListPage({super.key});
@@ -108,16 +34,15 @@ class ContributionsListPage extends ConsumerStatefulWidget {
 class _ContributionsListPageState extends ConsumerState<ContributionsListPage> {
   int _selectedTabIndex = 0; // 0 = Active, 1 = Archived
 
-  List<_MockContribution> get _activeContributions =>
-      _mockContributions.where((c) => !c.isArchived).toList();
-
-  List<_MockContribution> get _archivedContributions =>
-      _mockContributions.where((c) => c.isArchived).toList();
-
   @override
   Widget build(BuildContext context) {
-    final currentList =
-        _selectedTabIndex == 0 ? _activeContributions : _archivedContributions;
+    final communityState = ref.watch(communityProvider);
+    final communityId = communityState.activeCommunity?.id ?? '';
+
+    final isArchived = _selectedTabIndex == 1;
+    final listAsync = ref.watch(
+      contributionListProvider((communityId: communityId, archived: isArchived)),
+    );
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -171,17 +96,68 @@ class _ContributionsListPageState extends ConsumerState<ContributionsListPage> {
 
             // Content
             Expanded(
-              child: currentList.isEmpty
-                  ? _buildEmptyState()
-                  : ListView.separated(
+              child: listAsync.when(
+                loading: () => const Center(
+                  child: CircularProgressIndicator(
+                    color: _contributionPrimary,
+                  ),
+                ),
+                error: (error, stack) => Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.error_outline,
+                        size: 48,
+                        color: Colors.red,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Failed to load contributions',
+                        style: TextStyle(
+                          fontFamily: AppTextStyles.fontFamily,
+                          fontSize: 16,
+                          color: const Color(0xFF606060),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextButton(
+                        onPressed: () {
+                          ref.invalidate(contributionListProvider(
+                            (communityId: communityId, archived: isArchived),
+                          ));
+                        },
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                ),
+                data: (response) {
+                  final contributions = response.contributions;
+
+                  if (contributions.isEmpty) {
+                    return _buildEmptyState();
+                  }
+
+                  return RefreshIndicator(
+                    onRefresh: () async {
+                      ref.invalidate(contributionListProvider(
+                        (communityId: communityId, archived: isArchived),
+                      ));
+                    },
+                    color: _contributionPrimary,
+                    child: ListView.separated(
                       padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                      itemCount: currentList.length,
+                      itemCount: contributions.length,
                       separatorBuilder: (context, index) =>
                           const SizedBox(height: 16),
                       itemBuilder: (context, index) {
-                        return _buildContributionCard(currentList[index]);
+                        return _buildContributionCard(contributions[index]);
                       },
                     ),
+                  );
+                },
+              ),
             ),
           ],
         ),
@@ -245,19 +221,10 @@ class _ContributionsListPageState extends ConsumerState<ContributionsListPage> {
     );
   }
 
-  Widget _buildContributionCard(_MockContribution item) {
+  Widget _buildContributionCard(ContributionListItem item) {
     return GestureDetector(
       onTap: () {
-        context.push(
-          '${AppRoutes.contributionDetail}/${item.id}?name=${Uri.encodeComponent(item.name)}',
-          extra: {
-            'contributionType': item.contributionType,
-            'recipientName': item.recipientName,
-            'fixedAmount': item.fixedAmount,
-            'targetAmount': item.targetAmount,
-            'contributedSoFar': item.contributedSoFar,
-          },
-        );
+        context.push('${AppRoutes.contributionDetail}/${item.id}');
       },
       child: Container(
         padding: const EdgeInsets.all(12),
@@ -289,17 +256,17 @@ class _ContributionsListPageState extends ConsumerState<ContributionsListPage> {
                   ),
                   const SizedBox(height: 8),
 
-                  // Recipient row
+                  // Creator row
                   Row(
                     children: [
-                      _buildRecipientAvatar(item.recipientName, item.recipientPhotoUrl),
+                      _buildCreatorAvatar(item.creatorName),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Reciepient',
+                              'Created by',
                               style: TextStyle(
                                 fontFamily: AppTextStyles.fontFamily,
                                 fontSize: 10,
@@ -308,7 +275,7 @@ class _ContributionsListPageState extends ConsumerState<ContributionsListPage> {
                               ),
                             ),
                             Text(
-                              item.recipientName,
+                              item.isCreator ? 'You' : item.creatorName,
                               style: TextStyle(
                                 fontFamily: AppTextStyles.fontFamily,
                                 fontSize: 12,
@@ -324,20 +291,17 @@ class _ContributionsListPageState extends ConsumerState<ContributionsListPage> {
                   ),
                   const SizedBox(height: 8),
 
-                  // Status and Secondary tag row
+                  // Status and Type tag row
                   Row(
                     children: [
                       _buildStatusChip(item.status),
                       const SizedBox(width: 8),
-                      _buildChip(
-                        item.secondaryTag,
-                        _contributionLight,
-                      ),
+                      _buildTypeChip(item),
                     ],
                   ),
 
                   // Progress bar (only for active)
-                  if (item.status == 'active') ...[
+                  if (item.status == ContributionStatus.active) ...[
                     const SizedBox(height: 12),
                     Row(
                       children: [
@@ -345,7 +309,7 @@ class _ContributionsListPageState extends ConsumerState<ContributionsListPage> {
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(4),
                             child: LinearProgressIndicator(
-                              value: item.progress,
+                              value: item.progress / 100,
                               backgroundColor: Colors.white,
                               valueColor: const AlwaysStoppedAnimation<Color>(
                                   _contributionPrimary),
@@ -355,7 +319,9 @@ class _ContributionsListPageState extends ConsumerState<ContributionsListPage> {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          '${item.daysLeft} days till Deadline',
+                          item.daysRemaining != null && item.daysRemaining! > 0
+                              ? '${item.daysRemaining} days till Deadline'
+                              : 'No deadline',
                           style: TextStyle(
                             fontFamily: AppTextStyles.fontFamily,
                             fontSize: 11,
@@ -379,7 +345,6 @@ class _ContributionsListPageState extends ConsumerState<ContributionsListPage> {
     final hasImage = imageUrl != null && imageUrl.isNotEmpty;
 
     if (!hasImage) {
-      // Default icon when no image
       return Container(
         width: 120,
         height: 120,
@@ -401,7 +366,6 @@ class _ContributionsListPageState extends ConsumerState<ContributionsListPage> {
       );
     }
 
-    // Network image
     return ClipRRect(
       borderRadius: BorderRadius.circular(8),
       child: Image.network(
@@ -432,14 +396,7 @@ class _ContributionsListPageState extends ConsumerState<ContributionsListPage> {
     );
   }
 
-  Widget _buildRecipientAvatar(String name, String? photoUrl) {
-    if (photoUrl != null && photoUrl.isNotEmpty) {
-      return CircleAvatar(
-        radius: 14,
-        backgroundImage: NetworkImage(photoUrl),
-      );
-    }
-
+  Widget _buildCreatorAvatar(String name) {
     return CircleAvatar(
       radius: 14,
       backgroundColor: _getAvatarColor(name),
@@ -454,26 +411,27 @@ class _ContributionsListPageState extends ConsumerState<ContributionsListPage> {
     );
   }
 
-  Widget _buildStatusChip(String status) {
+  Widget _buildStatusChip(ContributionStatus status) {
     Color bgColor;
     String text;
 
     switch (status) {
-      case 'active':
+      case ContributionStatus.active:
         bgColor = const Color(0xFFD0F5CE);
         text = 'Active';
         break;
-      case 'completed':
+      case ContributionStatus.completed:
         bgColor = const Color(0xFFE0E0E0);
         text = 'Completed';
         break;
-      case 'cancelled':
+      case ContributionStatus.cancelled:
         bgColor = const Color(0xFFFFE0E0);
         text = 'Cancelled';
         break;
-      default:
+      case ContributionStatus.pendingInvites:
         bgColor = const Color(0xFFFAEFBF);
         text = 'Pending';
+        break;
     }
 
     return Container(
@@ -494,11 +452,28 @@ class _ContributionsListPageState extends ConsumerState<ContributionsListPage> {
     );
   }
 
-  Widget _buildChip(String text, Color bgColor) {
+  Widget _buildTypeChip(ContributionListItem item) {
+    String text;
+    switch (item.type) {
+      case ContributionType.fixed:
+        text = item.amount != null
+            ? '₦${_formatAmount(item.amount!)} person'
+            : 'Fixed amount';
+        break;
+      case ContributionType.target:
+        text = item.amount != null
+            ? '₦${_formatAmount(item.amount!)} target'
+            : 'Target amount';
+        break;
+      case ContributionType.flexible:
+        text = 'Flexible payments';
+        break;
+    }
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: bgColor,
+        color: _contributionLight,
         borderRadius: BorderRadius.circular(13),
       ),
       child: Text(
@@ -511,6 +486,15 @@ class _ContributionsListPageState extends ConsumerState<ContributionsListPage> {
         ),
       ),
     );
+  }
+
+  String _formatAmount(double amount) {
+    if (amount >= 1000000) {
+      return '${(amount / 1000000).toStringAsFixed(1)}M';
+    } else if (amount >= 1000) {
+      return '${(amount / 1000).toStringAsFixed(0)}K';
+    }
+    return amount.toStringAsFixed(0);
   }
 
   String _getInitials(String name) {

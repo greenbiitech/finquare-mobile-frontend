@@ -240,4 +240,8 @@ class ApiEndpoints {
   /// Respond to Contribution invitation: /contributions/{contributionId}/respond
   static String contributionRespondInvitation(String contributionId) =>
       '/contributions/$contributionId/respond';
+
+  /// Make a contribution payment: /contributions/{contributionId}/contribute
+  static String contributionContribute(String contributionId) =>
+      '/contributions/$contributionId/contribute';
 }

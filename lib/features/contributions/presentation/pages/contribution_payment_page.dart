@@ -6,6 +6,7 @@ import 'package:finsquare_mobile_app/config/theme/app_theme.dart';
 import 'package:finsquare_mobile_app/config/routes/app_router.dart';
 import 'package:finsquare_mobile_app/core/widgets/back_button.dart';
 import 'package:finsquare_mobile_app/features/contributions/presentation/widgets/contribution_pin_modal.dart';
+import 'package:finsquare_mobile_app/features/wallet/presentation/providers/wallet_provider.dart';
 
 const Color _contributionPrimary = Color(0xFFF83181);
 const Color _contributionLight = Color(0xFFFFE0ED);
@@ -49,8 +50,10 @@ class _ContributionPaymentPageState
   final _narrationController = TextEditingController();
   String _enteredAmount = '';
 
-  // Dummy wallet balance
-  final double _walletBalance = 500000.00;
+  double get _walletBalance {
+    final balanceStr = ref.watch(walletBalanceProvider);
+    return double.tryParse(balanceStr.replaceAll(',', '')) ?? 0.0;
+  }
 
   @override
   void dispose() {

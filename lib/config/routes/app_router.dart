@@ -694,17 +694,7 @@ GoRouter appRouter(Ref ref) {
         name: 'contributionDetail',
         builder: (context, state) {
           final contributionId = state.pathParameters['contributionId'] ?? '';
-          final contributionName = state.uri.queryParameters['name'] ?? 'Contribution';
-          final extra = state.extra as Map<String, dynamic>?;
-          return ContributionDetailPage(
-            contributionId: contributionId,
-            contributionName: contributionName,
-            contributionType: extra?['contributionType'] ?? PaymentContributionType.flexible,
-            recipientName: extra?['recipientName'] ?? '',
-            fixedAmount: extra?['fixedAmount'],
-            targetAmount: extra?['targetAmount'],
-            contributedSoFar: extra?['contributedSoFar'],
-          );
+          return ContributionDetailPage(contributionId: contributionId);
         },
       ),
       GoRoute(

@@ -17,6 +17,7 @@ class CustomTextField extends StatelessWidget {
   final int? minLines;
   final int? maxLength;
   final bool readOnly;
+  final bool enabled;
   final VoidCallback? onTap;
   final TextCapitalization textCapitalization;
 
@@ -37,6 +38,7 @@ class CustomTextField extends StatelessWidget {
     this.minLines,
     this.maxLength,
     this.readOnly = false,
+    this.enabled = true,
     this.onTap,
     this.textCapitalization = TextCapitalization.none,
   });
@@ -48,6 +50,7 @@ class CustomTextField extends StatelessWidget {
       validator: validator,
       onTap: onTap,
       readOnly: readOnly,
+      enabled: enabled,
       obscureText: obscureText,
       keyboardType: keyboardType,
       onChanged: onChanged,
@@ -56,15 +59,17 @@ class CustomTextField extends StatelessWidget {
       maxLength: maxLength,
       autovalidateMode: AutovalidateMode.onUserInteraction,
       textCapitalization: textCapitalization,
-      style: const TextStyle(
+      style: TextStyle(
         fontFamily: AppTextStyles.fontFamily,
         fontSize: 16,
-        color: AppColors.textPrimary,
+        color: enabled ? AppColors.textPrimary : AppColors.textSecondary,
       ),
       decoration: InputDecoration(
         hintText: hintText,
         errorMaxLines: 3,
         counterText: '', // Hide default counter, we show custom ones
+        filled: !enabled,
+        fillColor: !enabled ? const Color(0xFFF5F5F5) : null,
         label: Text(
           labelText,
           style: const TextStyle(
@@ -78,6 +83,10 @@ class CustomTextField extends StatelessWidget {
         ),
         enabledBorder: OutlineInputBorder(
           borderSide: const BorderSide(color: AppColors.textHint),
+          borderRadius: BorderRadius.circular(borderRadius),
+        ),
+        disabledBorder: OutlineInputBorder(
+          borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
           borderRadius: BorderRadius.circular(borderRadius),
         ),
         focusedBorder: OutlineInputBorder(

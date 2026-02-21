@@ -11,10 +11,23 @@ const Color _mainTextColor = Color(0xFF333333);
 
 /// Create Transaction PIN Page
 ///
-/// Seventh step in wallet setup flow.
+/// Used in both:
+/// - Tier 1 wallet creation (BVN or NIN flow)
+/// - Legacy wallet setup flow (Step 5)
+///
 /// User creates a 4-digit transaction PIN for wallet security.
 class CreateTransactionPinPage extends ConsumerStatefulWidget {
-  const CreateTransactionPinPage({super.key});
+  const CreateTransactionPinPage({
+    super.key,
+    this.verificationType,
+    this.verificationData,
+  });
+
+  /// 'BVN' or 'NIN' for Tier 1 flow, null for legacy flow
+  final String? verificationType;
+
+  /// Verification data (NIN or BVN data) for Tier 1 flow
+  final Map<String, dynamic>? verificationData;
 
   @override
   ConsumerState<CreateTransactionPinPage> createState() =>
@@ -45,8 +58,15 @@ class _CreateTransactionPinPageState
 
   void _onSubmitPressed() {
     if (_pin.length == 4) {
-      // Navigate to confirm PIN page with the first PIN
-      context.push(AppRoutes.confirmTransactionPin, extra: _pin);
+      // Navigate to confirm PIN page with the first PIN and verification info
+      context.push(
+        AppRoutes.confirmTransactionPin,
+        extra: {
+          'firstPin': _pin,
+          'verificationType': widget.verificationType,
+          'verificationData': widget.verificationData,
+        },
+      );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter a 4-digit PIN.')),

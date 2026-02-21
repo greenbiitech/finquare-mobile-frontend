@@ -57,6 +57,19 @@ class _SelectPayoutOrderPageState extends ConsumerState<SelectPayoutOrderPage> {
   Future<void> _handleCreateEsusu() async {
     Navigator.pop(context); // Close the modal
 
+    final state = ref.read(esusuCreationProvider);
+
+    // Check if admin needs to select slot before creating
+    // This happens when: Admin is participating AND Payout order is FCFS
+    if (state.adminNeedsSlotSelection) {
+      // Navigate to admin slot selection page
+      if (mounted) {
+        context.push(AppRoutes.adminSlotSelection);
+      }
+      return;
+    }
+
+    // Otherwise, create Esusu directly
     ref.showLoading('Creating Esusu...');
 
     final success =
@@ -67,8 +80,8 @@ class _SelectPayoutOrderPageState extends ConsumerState<SelectPayoutOrderPage> {
     if (success && mounted) {
       context.push(AppRoutes.esusuSuccess);
     } else if (mounted) {
-      final state = ref.read(esusuCreationProvider);
-      _showErrorDialog(state.error ?? 'Failed to create Esusu');
+      final updatedState = ref.read(esusuCreationProvider);
+      _showErrorDialog(updatedState.error ?? 'Failed to create Esusu');
     }
   }
 

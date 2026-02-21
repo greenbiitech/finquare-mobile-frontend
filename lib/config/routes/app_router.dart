@@ -90,6 +90,7 @@ import 'package:finsquare_mobile_app/features/contributions/presentation/pages/c
 import 'package:finsquare_mobile_app/features/contributions/presentation/pages/contribution_detail_page.dart';
 import 'package:finsquare_mobile_app/features/contributions/presentation/pages/contribution_payment_page.dart';
 import 'package:finsquare_mobile_app/features/contributions/presentation/pages/contribution_payment_success_page.dart';
+import 'package:finsquare_mobile_app/features/contributions/data/contributions_repository.dart';
 
 part 'app_router.g.dart';
 
@@ -707,7 +708,7 @@ GoRouter appRouter(Ref ref) {
             contributionName: extra?['contributionName'] ?? 'Contribution',
             recipientName: extra?['recipientName'] ?? '',
             amount: extra?['amount'] ?? 0.0,
-            contributionType: extra?['contributionType'] ?? PaymentContributionType.fixed,
+            contributionType: extra?['contributionType'] ?? ContributionType.fixed,
             contributedSoFar: extra?['contributedSoFar'],
           );
         },

@@ -94,6 +94,9 @@ class CreateHubPage extends ConsumerWidget {
                   description:
                       'Contribute with ease, track with clarity. Keep group finances transparent and on track.',
                   svgPath: 'assets/svgs/contributions.svg',
+                  onTap: () {
+                    context.push(AppRoutes.contributionsWelcome);
+                  },
                 ),
                 const SizedBox(height: 20),
                 _buildHubCard(

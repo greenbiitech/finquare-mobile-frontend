@@ -25,7 +25,9 @@ class _ConfigureEsusuPageState extends ConsumerState<ConfigureEsusuPage> {
   final TextEditingController _contributionController = TextEditingController();
 
   final List<String> _frequencyOptions = ['Weekly', 'Monthly', 'Quarterly'];
-  final List<int> _commissionOptions = List.generate(50, (i) => i + 1);
+  final List<int> _commissionPercentageOptions = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50];
+
+  final TextEditingController _commissionAmountController = TextEditingController();
 
   final currencyFormat = NumberFormat.currency(
     locale: 'en_NG',
@@ -41,12 +43,16 @@ class _ConfigureEsusuPageState extends ConsumerState<ConfigureEsusuPage> {
       if (state.contributionAmount != null) {
         _contributionController.text = state.contributionAmount!.toStringAsFixed(0);
       }
+      if (state.commissionAmount != null) {
+        _commissionAmountController.text = state.commissionAmount!.toStringAsFixed(0);
+      }
     });
   }
 
   @override
   void dispose() {
     _contributionController.dispose();
+    _commissionAmountController.dispose();
     super.dispose();
   }
 
@@ -106,7 +112,7 @@ class _ConfigureEsusuPageState extends ConsumerState<ConfigureEsusuPage> {
 
   Future<void> _selectCollectionDate(BuildContext context) async {
     final state = ref.read(esusuCreationProvider);
-    final minDate = state.minimumCollectionDate ?? DateTime.now().add(const Duration(days: 4));
+    final minDate = state.minimumCollectionDate ?? DateTime.now().add(const Duration(days: 2));
 
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -323,7 +329,7 @@ class _ConfigureEsusuPageState extends ConsumerState<ConfigureEsusuPage> {
                     const SizedBox(height: 4),
                     Text(
                       state.participationDeadline != null
-                          ? 'Must be at least 3 days after deadline'
+                          ? 'Must be at least 24 hours after deadline'
                           : 'Select participation deadline first',
                       style: TextStyle(
                         fontFamily: AppTextStyles.fontFamily,
@@ -390,29 +396,48 @@ class _ConfigureEsusuPageState extends ConsumerState<ConfigureEsusuPage> {
                     ),
                     const SizedBox(height: 16),
 
-                    // Commission percentage (visible when checkbox is checked)
+                    // Commission options (visible when checkbox is checked)
                     if (state.takeCommission) ...[
-                      Text(
-                        'Commission percentage',
-                        style: TextStyle(
-                          fontFamily: AppTextStyles.fontFamily,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w400,
-                          color: Colors.black,
+                      // Cash / Percentage toggle
+                      _buildCommissionTypeToggle(state),
+                      const SizedBox(height: 16),
+
+                      // Commission input based on type
+                      if (state.commissionType == CommissionType.cash) ...[
+                        _buildOutlinedTextField(
+                          controller: _commissionAmountController,
+                          label: 'Commission per payout',
+                          hint: 'e.g. \u20A6100',
+                          prefix: '\u20A6 ',
+                          keyboardType: TextInputType.number,
+                          onChanged: (value) {
+                            final amount = double.tryParse(value.replaceAll(',', ''));
+                            ref.read(esusuCreationProvider.notifier).setCommissionAmount(amount);
+                          },
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      _buildDropdown<int>(
-                        value: state.commissionPercentage,
-                        items: _commissionOptions,
-                        hint: 'Select percentage',
-                        onChanged: (value) {
-                          ref.read(esusuCreationProvider.notifier).setCommissionPercentage(value);
-                        },
-                        itemLabel: (item) => '$item%',
-                      ),
+                      ] else ...[
+                        Text(
+                          'Commission percentage',
+                          style: TextStyle(
+                            fontFamily: AppTextStyles.fontFamily,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w400,
+                            color: Colors.black,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        _buildDropdown<int>(
+                          value: state.commissionPercentage,
+                          items: _commissionPercentageOptions,
+                          hint: 'Select percentage',
+                          onChanged: (value) {
+                            ref.read(esusuCreationProvider.notifier).setCommissionPercentage(value);
+                          },
+                          itemLabel: (item) => '$item%',
+                        ),
+                      ],
                       const SizedBox(height: 4),
-                      if (state.commissionPercentage != null && state.totalPool > 0)
+                      if (state.commission > 0 && state.totalPool > 0)
                         Text(
                           'You will earn ${currencyFormat.format(state.commission)} per cycle',
                           style: TextStyle(
@@ -424,7 +449,9 @@ class _ConfigureEsusuPageState extends ConsumerState<ConfigureEsusuPage> {
                         )
                       else
                         Text(
-                          'Select participants and amount to see commission',
+                          state.commissionType == CommissionType.cash
+                              ? 'Enter commission amount'
+                              : 'Select percentage to see commission',
                           style: TextStyle(
                             fontFamily: AppTextStyles.fontFamily,
                             fontSize: 12,
@@ -606,6 +633,84 @@ class _ConfigureEsusuPageState extends ConsumerState<ConfigureEsusuPage> {
     );
   }
 
+  Widget _buildCommissionTypeToggle(EsusuCreationState state) {
+    return Row(
+      children: [
+        Expanded(
+          child: GestureDetector(
+            onTap: () {
+              ref.read(esusuCreationProvider.notifier).setCommissionType(CommissionType.cash);
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: state.commissionType == CommissionType.cash
+                    ? const Color(0xFFEBDAFB)
+                    : const Color(0xFFF3F3F3),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: state.commissionType == CommissionType.cash
+                      ? _esusuPrimaryColor
+                      : Colors.transparent,
+                  width: 1,
+                ),
+              ),
+              child: Center(
+                child: Text(
+                  'Cash',
+                  style: TextStyle(
+                    fontFamily: AppTextStyles.fontFamily,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: state.commissionType == CommissionType.cash
+                        ? _esusuPrimaryColor
+                        : const Color(0xFF606060),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: GestureDetector(
+            onTap: () {
+              ref.read(esusuCreationProvider.notifier).setCommissionType(CommissionType.percentage);
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: state.commissionType == CommissionType.percentage
+                    ? const Color(0xFFEBDAFB)
+                    : const Color(0xFFF3F3F3),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: state.commissionType == CommissionType.percentage
+                      ? _esusuPrimaryColor
+                      : Colors.transparent,
+                  width: 1,
+                ),
+              ),
+              child: Center(
+                child: Text(
+                  'Percentage',
+                  style: TextStyle(
+                    fontFamily: AppTextStyles.fontFamily,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: state.commissionType == CommissionType.percentage
+                        ? _esusuPrimaryColor
+                        : const Color(0xFF606060),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildSummaryCard(EsusuCreationState state) {
     final schedule = _generatePayoutSchedule(state);
 
@@ -647,18 +752,49 @@ class _ConfigureEsusuPageState extends ConsumerState<ConfigureEsusuPage> {
           const SizedBox(height: 8),
 
           // Commission
-          if (state.takeCommission && state.commissionPercentage != null) ...[
+          if (state.takeCommission && state.commission > 0) ...[
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Commission (${state.commissionPercentage}%)',
-                  style: TextStyle(
-                    fontFamily: AppTextStyles.fontFamily,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w400,
-                    color: const Color(0xFF606060),
-                  ),
+                Row(
+                  children: [
+                    Text(
+                      'Commission',
+                      style: TextStyle(
+                        fontFamily: AppTextStyles.fontFamily,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w400,
+                        color: const Color(0xFF606060),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    GestureDetector(
+                      onTap: () {
+                        showDialog(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: const Text('Commission'),
+                            content: Text(
+                              state.commissionType == CommissionType.percentage
+                                  ? 'You will earn ${state.commissionPercentage}% of each payout as commission.'
+                                  : 'You will earn a fixed ${currencyFormat.format(state.commissionAmount ?? 0)} from each payout as commission.',
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context),
+                                child: const Text('Got it'),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                      child: const Icon(
+                        Icons.info_outline,
+                        size: 14,
+                        color: Color(0xFF9E9E9E),
+                      ),
+                    ),
+                  ],
                 ),
                 Text(
                   currencyFormat.format(state.commission),

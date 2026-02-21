@@ -6,6 +6,7 @@ import 'package:finsquare_mobile_app/config/routes/app_router.dart';
 import 'package:finsquare_mobile_app/config/theme/app_theme.dart';
 import 'package:finsquare_mobile_app/core/services/snackbar_service.dart';
 import 'package:finsquare_mobile_app/core/widgets/back_button.dart';
+import 'package:finsquare_mobile_app/features/auth/presentation/providers/auth_provider.dart';
 import 'package:finsquare_mobile_app/features/wallet/data/wallet_repository.dart';
 
 // Colors from old codebase
@@ -13,12 +14,26 @@ const Color _mainTextColor = Color(0xFF333333);
 
 /// Confirm Transaction PIN Page
 ///
-/// Final step in wallet setup flow.
+/// Used in both:
+/// - Tier 1 wallet creation (BVN or NIN flow)
+/// - Legacy wallet setup flow (Step 5)
+///
 /// User confirms their 4-digit PIN to create the wallet.
 class ConfirmTransactionPinPage extends ConsumerStatefulWidget {
-  const ConfirmTransactionPinPage({super.key, required this.firstPin});
+  const ConfirmTransactionPinPage({
+    super.key,
+    required this.firstPin,
+    this.verificationType,
+    this.verificationData,
+  });
 
   final String firstPin;
+
+  /// 'BVN' or 'NIN' for Tier 1 flow, null for legacy flow
+  final String? verificationType;
+
+  /// Verification data for Tier 1 flow
+  final Map<String, dynamic>? verificationData;
 
   @override
   ConsumerState<ConfirmTransactionPinPage> createState() =>
@@ -69,16 +84,54 @@ class _ConfirmTransactionPinPageState
 
     try {
       final walletRepo = ref.read(walletRepositoryProvider);
-      final request = CompleteStep5Request(transactionPin: _pin);
-      final response = await walletRepo.completeStep5(request);
 
-      if (!mounted) return;
+      // Check if this is a Tier 1 flow (BVN or NIN verification)
+      if (widget.verificationType != null) {
+        // Tier 1 wallet creation
+        final response = await walletRepo.completeTier1(
+          pin: _pin,
+          confirmPin: _pin,
+        );
 
-      if (response.success) {
-        HapticFeedback.heavyImpact();
-        context.go(AppRoutes.walletSuccess);
+        if (!mounted) return;
+
+        if (response.success) {
+          HapticFeedback.heavyImpact();
+          // Refresh auth state to update hasWallet flag
+          await ref.read(authProvider.notifier).refreshUserProfile();
+          if (!mounted) return;
+          context.go(
+            AppRoutes.walletSuccess,
+            extra: {
+              'accountNumber': response.accountNumber,
+              'accountName': response.accountName,
+            },
+          );
+        } else {
+          showErrorSnackbar(response.message);
+        }
       } else {
-        showErrorSnackbar(response.message);
+        // Legacy flow - Step 5
+        final request = CompleteStep5Request(transactionPin: _pin);
+        final response = await walletRepo.completeStep5(request);
+
+        if (!mounted) return;
+
+        if (response.success) {
+          HapticFeedback.heavyImpact();
+          // Refresh auth state to update hasWallet flag
+          await ref.read(authProvider.notifier).refreshUserProfile();
+          if (!mounted) return;
+          context.go(
+            AppRoutes.walletSuccess,
+            extra: {
+              'accountNumber': response.accountNumber,
+              'accountName': response.accountName,
+            },
+          );
+        } else {
+          showErrorSnackbar(response.message);
+        }
       }
     } catch (e) {
       if (!mounted) return;

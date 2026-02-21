@@ -616,120 +616,199 @@ class _SelectMemberModalState extends ConsumerState<_SelectMemberModal> {
     bool isSelected,
     int participantsLeft,
   ) {
-    final canAdd = !isSelected && participantsLeft > 0;
+    final hasWallet = member.isEligibleForEsusu;
+    final canAdd = !isSelected && participantsLeft > 0 && hasWallet;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 24,
-            backgroundColor: _getAvatarColor(member.fullName),
-            backgroundImage:
-                member.photo != null ? NetworkImage(member.photo!) : null,
-            child: member.photo == null
-                ? Text(
-                    _getInitials(member.fullName),
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    ),
-                  )
-                : null,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        member.fullName,
-                        style: TextStyle(
-                          fontFamily: AppTextStyles.fontFamily,
-                          fontSize: 14,
+    return GestureDetector(
+      onTap: !hasWallet
+          ? () => _showNoWalletMessage(member.fullName)
+          : null,
+      child: Opacity(
+        opacity: hasWallet ? 1.0 : 0.5,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 24,
+                backgroundColor: _getAvatarColor(member.fullName),
+                backgroundImage:
+                    member.photo != null ? NetworkImage(member.photo!) : null,
+                child: member.photo == null
+                    ? Text(
+                        _getInitials(member.fullName),
+                        style: const TextStyle(
+                          fontSize: 18,
                           fontWeight: FontWeight.w600,
-                          color: Colors.black,
+                          color: Colors.white,
                         ),
-                        overflow: TextOverflow.ellipsis,
+                      )
+                    : null,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            member.fullName,
+                            style: TextStyle(
+                              fontFamily: AppTextStyles.fontFamily,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: hasWallet ? Colors.black : Colors.grey,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (member.isAdmin) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding:
+                                const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: _esusuPrimaryColor.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              'Admin',
+                              style: TextStyle(
+                                fontFamily: AppTextStyles.fontFamily,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w500,
+                                color: _esusuPrimaryColor,
+                              ),
+                            ),
+                          ),
+                        ],
+                        if (!hasWallet) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding:
+                                const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.shade100,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              'No wallet',
+                              style: TextStyle(
+                                fontFamily: AppTextStyles.fontFamily,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.orange.shade800,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    Text(
+                      member.email,
+                      style: TextStyle(
+                        fontFamily: AppTextStyles.fontFamily,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w400,
+                        color: const Color(0xFF606060),
                       ),
                     ),
-                    if (member.isAdmin) ...[
-                      const SizedBox(width: 6),
-                      Container(
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: _esusuPrimaryColor.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          'Admin',
-                          style: TextStyle(
-                            fontFamily: AppTextStyles.fontFamily,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w500,
-                            color: _esusuPrimaryColor,
-                          ),
+                  ],
+                ),
+              ),
+              if (hasWallet)
+                GestureDetector(
+                  onTap: canAdd
+                      ? () {
+                          widget.onAdd(member);
+                          setState(() {});
+                        }
+                      : isSelected
+                          ? () {
+                              widget.onRemove(member.id);
+                              setState(() {});
+                            }
+                          : null,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: isSelected ? _esusuPrimaryColor : null,
+                      border: Border.all(
+                        color: canAdd || isSelected
+                            ? _esusuPrimaryColor
+                            : Colors.grey.shade300,
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      isSelected ? 'Added' : 'Add',
+                      style: TextStyle(
+                        fontFamily: AppTextStyles.fontFamily,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: isSelected
+                            ? Colors.white
+                            : canAdd
+                                ? _esusuPrimaryColor
+                                : Colors.grey,
+                      ),
+                    ),
+                  ),
+                )
+              else
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade200,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        size: 14,
+                        color: Colors.grey.shade600,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Ineligible',
+                        style: TextStyle(
+                          fontFamily: AppTextStyles.fontFamily,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.grey.shade600,
                         ),
                       ),
                     ],
-                  ],
-                ),
-                Text(
-                  member.email,
-                  style: TextStyle(
-                    fontFamily: AppTextStyles.fontFamily,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w400,
-                    color: const Color(0xFF606060),
                   ),
                 ),
-              ],
-            ),
+            ],
           ),
-          GestureDetector(
-            onTap: canAdd
-                ? () {
-                    widget.onAdd(member);
-                    setState(() {});
-                  }
-                : isSelected
-                    ? () {
-                        widget.onRemove(member.id);
-                        setState(() {});
-                      }
-                    : null,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: isSelected ? _esusuPrimaryColor : null,
-                border: Border.all(
-                  color: canAdd || isSelected
-                      ? _esusuPrimaryColor
-                      : Colors.grey.shade300,
-                ),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                isSelected ? 'Added' : 'Add',
-                style: TextStyle(
-                  fontFamily: AppTextStyles.fontFamily,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: isSelected
-                      ? Colors.white
-                      : canAdd
-                          ? _esusuPrimaryColor
-                          : Colors.grey,
-                ),
-              ),
-            ),
+        ),
+      ),
+    );
+  }
+
+  void _showNoWalletMessage(String memberName) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '$memberName hasn\'t set up their wallet yet. Only members with active wallets can participate in Esusu.',
+          style: TextStyle(
+            fontFamily: AppTextStyles.fontFamily,
+            fontSize: 14,
           ),
-        ],
+        ),
+        backgroundColor: Colors.orange.shade700,
+        duration: const Duration(seconds: 3),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
       ),
     );
   }

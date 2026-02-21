@@ -14,7 +14,7 @@ const Color _mainTextColor = Color(0xFF333333);
 
 /// Verify BVN Credentials Page
 ///
-/// Third step in wallet setup flow.
+/// Third step in wallet setup flow (or upgrade flow).
 /// User enters their full email or phone number to verify ownership.
 /// When they click Continue, API is called to send OTP to that method.
 class VerifyBvnCredentialsPage extends ConsumerStatefulWidget {
@@ -22,10 +22,12 @@ class VerifyBvnCredentialsPage extends ConsumerStatefulWidget {
     super.key,
     required this.sessionId,
     required this.method,
+    this.isUpgrade = false,
   });
 
   final String sessionId;
   final String method; // 'phone', 'email', or 'alternate_phone'
+  final bool isUpgrade; // True for Tier 2 upgrade flow
 
   @override
   ConsumerState<VerifyBvnCredentialsPage> createState() =>
@@ -59,7 +61,8 @@ class _VerifyBvnCredentialsPageState
       return RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value);
     } else {
       // Phone number validation for both 'phone' and 'alternate_phone'
-      return RegExp(r'^0[789]\d{9}$').hasMatch(value);
+      // Accepts: 0XXXXXXXXXX (11 digits) or 234XXXXXXXXXX (13 digits)
+      return RegExp(r'^(0[789]\d{9}|234[789]\d{9})$').hasMatch(value);
     }
   }
 
@@ -76,26 +79,50 @@ class _VerifyBvnCredentialsPageState
 
     try {
       final walletRepo = ref.read(walletRepositoryProvider);
-      final response = await walletRepo.verifyBvnMethod(
-        sessionId: widget.sessionId,
-        method: widget.method,
-        // Pass phone number for alternate_phone method
-        phoneNumber: _isAlternatePhone ? _credentialController.text.trim() : null,
-      );
 
-      if (!mounted) return;
-
-      if (response.success) {
-        // Navigate to OTP verification with session data
-        context.push(
-          AppRoutes.verifyOtp,
-          extra: {
-            'sessionId': widget.sessionId,
-            'method': widget.method,
-          },
+      // Use upgrade-specific endpoint if in upgrade mode
+      if (widget.isUpgrade) {
+        final response = await walletRepo.verifyUpgradeBvnMethod(
+          sessionId: widget.sessionId,
+          method: widget.method,
+          phoneNumber: _isAlternatePhone ? _credentialController.text.trim() : null,
         );
+
+        if (!mounted) return;
+
+        if (response.success) {
+          context.push(
+            AppRoutes.verifyOtp,
+            extra: {
+              'sessionId': widget.sessionId,
+              'method': widget.method,
+              'isUpgrade': true,
+            },
+          );
+        } else {
+          _showError(response.message);
+        }
       } else {
-        _showError(response.message);
+        final response = await walletRepo.verifyBvnMethod(
+          sessionId: widget.sessionId,
+          method: widget.method,
+          phoneNumber: _isAlternatePhone ? _credentialController.text.trim() : null,
+        );
+
+        if (!mounted) return;
+
+        if (response.success) {
+          context.push(
+            AppRoutes.verifyOtp,
+            extra: {
+              'sessionId': widget.sessionId,
+              'method': widget.method,
+              'isUpgrade': false,
+            },
+          );
+        } else {
+          _showError(response.message);
+        }
       }
     } catch (e) {
       if (!mounted) return;
@@ -185,9 +212,9 @@ class _VerifyBvnCredentialsPageState
                           ? null
                           : 'Please enter a valid email address';
                     } else {
-                      return RegExp(r'^0[789]\d{9}$').hasMatch(value)
+                      return RegExp(r'^(0[789]\d{9}|234[789]\d{9})$').hasMatch(value)
                           ? null
-                          : 'Please enter a valid phone number (e.g., 08012345678)';
+                          : 'Please enter a valid phone number (e.g., 08012345678 or 2348012345678)';
                     }
                   },
                 ),

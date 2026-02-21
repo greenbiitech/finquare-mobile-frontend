@@ -10,51 +10,11 @@ import 'package:finsquare_mobile_app/config/routes/app_router.dart';
 import 'package:finsquare_mobile_app/config/theme/app_theme.dart';
 import 'package:finsquare_mobile_app/core/widgets/back_button.dart';
 import 'package:finsquare_mobile_app/core/widgets/custom_text_field.dart';
+import 'package:finsquare_mobile_app/features/contributions/data/contributions_repository.dart';
 
 // Contribution brand colors
 const Color _contributionPrimary = Color(0xFFF83181);
 const Color _contributionAccent = Color(0xFFF9DEE9);
-
-enum ContributionType {
-  fixedAmount,
-  targetContribution,
-  flexible,
-}
-
-extension ContributionTypeExtension on ContributionType {
-  String get title {
-    switch (this) {
-      case ContributionType.fixedAmount:
-        return 'Fixed amount';
-      case ContributionType.targetContribution:
-        return 'Target Contribution';
-      case ContributionType.flexible:
-        return 'Flexible';
-    }
-  }
-
-  String get description {
-    switch (this) {
-      case ContributionType.fixedAmount:
-        return 'Participants contribute a fixed amount before a set date';
-      case ContributionType.targetContribution:
-        return 'Participants contribute a fixed cumulative amount before a set date';
-      case ContributionType.flexible:
-        return 'Participants contribute as they like till a certain goal is reached';
-    }
-  }
-
-  String get iconPath {
-    switch (this) {
-      case ContributionType.fixedAmount:
-        return 'assets/svgs/contributions/fixed_amount.svg';
-      case ContributionType.targetContribution:
-        return 'assets/svgs/contributions/target_contribution.svg';
-      case ContributionType.flexible:
-        return 'assets/svgs/contributions/flexible.svg';
-    }
-  }
-}
 
 class CreateContributionPage extends ConsumerStatefulWidget {
   const CreateContributionPage({super.key});

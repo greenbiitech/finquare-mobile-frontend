@@ -60,14 +60,36 @@ enum ContributionType {
     }
   }
 
+  String get title {
+    switch (this) {
+      case ContributionType.fixed:
+        return 'Fixed amount';
+      case ContributionType.target:
+        return 'Target Contribution';
+      case ContributionType.flexible:
+        return 'Flexible';
+    }
+  }
+
   String get description {
     switch (this) {
       case ContributionType.fixed:
-        return 'Everyone contributes the same amount';
+        return 'Participants contribute a fixed amount before a set date';
       case ContributionType.target:
-        return 'Work towards a specific goal amount';
+        return 'Participants contribute a fixed cumulative amount before a set date';
       case ContributionType.flexible:
-        return 'Contribute any amount at will';
+        return 'Participants contribute as they like till a certain goal is reached';
+    }
+  }
+
+  String get iconPath {
+    switch (this) {
+      case ContributionType.fixed:
+        return 'assets/svgs/contributions/fixed_amount.svg';
+      case ContributionType.target:
+        return 'assets/svgs/contributions/target_contribution.svg';
+      case ContributionType.flexible:
+        return 'assets/svgs/contributions/flexible.svg';
     }
   }
 }

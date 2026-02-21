@@ -48,6 +48,148 @@ class BvnData {
   }
 }
 
+/// NIN Data Model
+class NinData {
+  final String? nin;
+  final String? firstName;
+  final String? lastName;
+  final String? middleName;
+  final String? phoneNumber;
+  final String? dateOfBirth;
+  final String? gender;
+  final String? photo;
+
+  NinData({
+    this.nin,
+    this.firstName,
+    this.lastName,
+    this.middleName,
+    this.phoneNumber,
+    this.dateOfBirth,
+    this.gender,
+    this.photo,
+  });
+
+  factory NinData.fromJson(Map<String, dynamic>? json) {
+    if (json == null) return NinData();
+    return NinData(
+      nin: json['nin'],
+      firstName: json['firstName'] ?? json['first_name'],
+      lastName: json['lastName'] ?? json['surname'],
+      middleName: json['middleName'] ?? json['middle_name'],
+      phoneNumber: json['phoneNumber'] ?? json['phone_number'],
+      dateOfBirth: json['dateOfBirth'] ?? json['date_of_birth'],
+      gender: json['gender'],
+      photo: json['photo'],
+    );
+  }
+
+  String get fullName {
+    final parts = [firstName, middleName, lastName]
+        .where((p) => p != null && p.isNotEmpty)
+        .toList();
+    return parts.join(' ');
+  }
+}
+
+/// NIN Lookup Response Model
+class NinLookupResponse {
+  final bool success;
+  final String? message;
+  final NinData? data;
+
+  NinLookupResponse({
+    required this.success,
+    this.message,
+    this.data,
+  });
+
+  factory NinLookupResponse.fromJson(Map<String, dynamic> json) {
+    final data = json['data'] as Map<String, dynamic>?;
+    return NinLookupResponse(
+      success: json['success'] ?? false,
+      message: json['message'],
+      data: data != null ? NinData.fromJson(data) : null,
+    );
+  }
+}
+
+/// Upgrade Status Response Model
+class UpgradeStatusResponse {
+  final bool success;
+  final String currentTier;
+  final String upgradeStatus;
+  final String? currentStep;
+  final String? missingIdentity;
+  final bool hasBvn;
+  final bool hasNin;
+  final bool canUpgradeToTier2;
+  final bool canUpgradeToTier3;
+
+  UpgradeStatusResponse({
+    required this.success,
+    required this.currentTier,
+    required this.upgradeStatus,
+    this.currentStep,
+    this.missingIdentity,
+    required this.hasBvn,
+    required this.hasNin,
+    required this.canUpgradeToTier2,
+    required this.canUpgradeToTier3,
+  });
+
+  factory UpgradeStatusResponse.fromJson(Map<String, dynamic> json) {
+    final data = json['data'] as Map<String, dynamic>?;
+    return UpgradeStatusResponse(
+      success: json['success'] ?? false,
+      currentTier: data?['currentTier'] ?? 'TIER_1',
+      upgradeStatus: data?['upgradeStatus'] ?? 'NOT_STARTED',
+      currentStep: data?['currentStep'],
+      missingIdentity: data?['missingIdentity'],
+      hasBvn: data?['hasBvn'] ?? false,
+      hasNin: data?['hasNin'] ?? false,
+      canUpgradeToTier2: data?['canUpgradeToTier2'] ?? false,
+      canUpgradeToTier3: data?['canUpgradeToTier3'] ?? false,
+    );
+  }
+
+  bool get isUpgradeInProgress => upgradeStatus == 'IN_PROGRESS';
+  bool get isPendingApproval => upgradeStatus == 'PENDING_APPROVAL';
+  bool get isApproved => upgradeStatus == 'APPROVED';
+  bool get isDeclined => upgradeStatus == 'DECLINED';
+}
+
+/// Tier 1 Completion Response Model
+class Tier1CompletionResponse {
+  final bool success;
+  final String message;
+  final String? walletId;
+  final String? accountNumber;
+  final String? accountName;
+  final String? tier;
+
+  Tier1CompletionResponse({
+    required this.success,
+    required this.message,
+    this.walletId,
+    this.accountNumber,
+    this.accountName,
+    this.tier,
+  });
+
+  factory Tier1CompletionResponse.fromJson(Map<String, dynamic> json) {
+    final data = json['data'] as Map<String, dynamic>?;
+    return Tier1CompletionResponse(
+      success: json['success'] ?? false,
+      message: json['message'] ?? '',
+      walletId: data?['walletId'],
+      accountNumber: data?['accountNumber'],
+      accountName: data?['accountName'],
+      tier: data?['tier'],
+    );
+  }
+}
+
 /// Address Data Model
 class AddressData {
   final String? address;
@@ -302,6 +444,38 @@ class BvnDetailsResponse {
         dateOfBirth: data?['dateOfBirth'],
         gender: data?['gender'],
       ),
+    );
+  }
+}
+
+/// Upgrade BVN Details Response Model (includes nextStep for upgrade flow)
+class UpgradeBvnDetailsResponse {
+  final bool success;
+  final String message;
+  final BvnData bvnData;
+  final String? nextStep;
+
+  UpgradeBvnDetailsResponse({
+    required this.success,
+    required this.message,
+    required this.bvnData,
+    this.nextStep,
+  });
+
+  factory UpgradeBvnDetailsResponse.fromJson(Map<String, dynamic> json) {
+    final data = json['data'] as Map<String, dynamic>?;
+    return UpgradeBvnDetailsResponse(
+      success: json['success'] ?? false,
+      message: json['message'] ?? '',
+      bvnData: BvnData(
+        firstName: data?['firstName'],
+        lastName: data?['lastName'],
+        middleName: data?['middleName'],
+        phoneNumber: data?['phoneNumber'],
+        dateOfBirth: data?['dateOfBirth'],
+        gender: data?['gender'],
+      ),
+      nextStep: data?['nextStep'],
     );
   }
 }
@@ -594,6 +768,241 @@ class WalletRepository {
   }
 
   // ============================================
+  // NIN VALIDATION METHODS (Tier 1)
+  // ============================================
+
+  /// Lookup NIN - Single step verification (no OTP required)
+  /// Requires dateOfBirth for ownership verification
+  /// Returns NIN holder's details on success
+  Future<NinLookupResponse> lookupNin(String nin, String dateOfBirth) async {
+    final response = await _apiClient.post(
+      ApiEndpoints.ninLookup,
+      data: {
+        'nin': nin,
+        'dateOfBirth': dateOfBirth,
+      },
+    );
+    return NinLookupResponse.fromJson(response.data);
+  }
+
+  // ============================================
+  // TIER-BASED WALLET CREATION
+  // ============================================
+
+  /// Complete Tier 1 Wallet Creation
+  /// Creates wallet using either BVN or NIN verification
+  Future<Tier1CompletionResponse> completeTier1({
+    required String pin,
+    required String confirmPin,
+  }) async {
+    final response = await _apiClient.post(
+      ApiEndpoints.walletTier1Complete,
+      data: {
+        'pin': pin,
+        'confirmPin': confirmPin,
+      },
+    );
+    return Tier1CompletionResponse.fromJson(response.data);
+  }
+
+  // ============================================
+  // WALLET UPGRADE (Tier 2/3)
+  // ============================================
+
+  /// Get upgrade status
+  Future<UpgradeStatusResponse> getUpgradeStatus() async {
+    final response = await _apiClient.get(ApiEndpoints.upgradeStatus);
+    return UpgradeStatusResponse.fromJson(response.data);
+  }
+
+  /// Start upgrade to Tier 2 or Tier 3
+  Future<WalletResponse> startUpgrade(String targetTier) async {
+    final response = await _apiClient.post(
+      ApiEndpoints.upgradeStart,
+      data: {'targetTier': targetTier},
+    );
+    return WalletResponse.fromJson(response.data);
+  }
+
+  /// Submit missing identity (BVN or NIN)
+  Future<WalletResponse> submitUpgradeIdentity({
+    String? bvn,
+    String? nin,
+  }) async {
+    final response = await _apiClient.post(
+      ApiEndpoints.upgradeIdentity,
+      data: {
+        if (bvn != null) 'bvn': bvn,
+        if (nin != null) 'nin': nin,
+      },
+    );
+    return WalletResponse.fromJson(response.data);
+  }
+
+  /// Submit personal info for upgrade
+  Future<WalletResponse> submitUpgradePersonalInfo({
+    required String firstName,
+    required String lastName,
+    String? middleName,
+    required String dateOfBirth,
+    required String gender,
+    required String email,
+    required String phoneNumber,
+    required bool isPep,
+  }) async {
+    final response = await _apiClient.post(
+      ApiEndpoints.upgradePersonalInfo,
+      data: {
+        'firstName': firstName,
+        'lastName': lastName,
+        if (middleName != null) 'middleName': middleName,
+        'dateOfBirth': dateOfBirth,
+        'gender': gender,
+        'email': email,
+        'phoneNumber': phoneNumber,
+        'isPep': isPep,
+      },
+    );
+    return WalletResponse.fromJson(response.data);
+  }
+
+  /// Submit ID document for upgrade
+  Future<WalletResponse> submitUpgradeIdDocument({
+    required String idType,
+    required String idNumber,
+    String? issueDate,
+    required String expiryDate,
+    required String frontUrl,
+    String? backUrl,
+  }) async {
+    final response = await _apiClient.post(
+      ApiEndpoints.upgradeIdDocument,
+      data: {
+        'idType': idType,
+        'idNumber': idNumber,
+        if (issueDate != null) 'issueDate': issueDate,
+        'expiryDate': expiryDate,
+        'frontUrl': frontUrl,
+        if (backUrl != null) 'backUrl': backUrl,
+      },
+    );
+    return WalletResponse.fromJson(response.data);
+  }
+
+  /// Submit face photo for upgrade
+  Future<WalletResponse> submitUpgradeFace(String facePhotoUrl) async {
+    final response = await _apiClient.post(
+      ApiEndpoints.upgradeFace,
+      data: {'facePhotoUrl': facePhotoUrl},
+    );
+    return WalletResponse.fromJson(response.data);
+  }
+
+  /// Submit address for upgrade
+  Future<WalletResponse> submitUpgradeAddress({
+    String? houseNumber,
+    required String streetName,
+    required String city,
+    required String state,
+    required String lga,
+    String? nearestLandmark,
+  }) async {
+    final response = await _apiClient.post(
+      ApiEndpoints.upgradeAddress,
+      data: {
+        if (houseNumber != null) 'houseNumber': houseNumber,
+        'streetName': streetName,
+        'city': city,
+        'state': state,
+        'lga': lga,
+        if (nearestLandmark != null) 'nearestLandmark': nearestLandmark,
+      },
+    );
+    return WalletResponse.fromJson(response.data);
+  }
+
+  /// Submit utility bill for Tier 3 upgrade
+  Future<WalletResponse> submitUpgradeUtilityBill({
+    required String billType,
+    required String billUrl,
+  }) async {
+    final response = await _apiClient.post(
+      ApiEndpoints.upgradeUtilityBill,
+      data: {
+        'billType': billType,
+        'billUrl': billUrl,
+      },
+    );
+    return WalletResponse.fromJson(response.data);
+  }
+
+  /// Submit signature for Tier 3 upgrade
+  Future<WalletResponse> submitUpgradeSignature(String signatureUrl) async {
+    final response = await _apiClient.post(
+      ApiEndpoints.upgradeSignature,
+      data: {'signatureUrl': signatureUrl},
+    );
+    return WalletResponse.fromJson(response.data);
+  }
+
+  /// Cancel ongoing upgrade
+  Future<WalletResponse> cancelUpgrade() async {
+    final response = await _apiClient.post(ApiEndpoints.upgradeCancel);
+    return WalletResponse.fromJson(response.data);
+  }
+
+  // ============================================
+  // UPGRADE BVN VALIDATION (with OTP)
+  // ============================================
+
+  /// Step 1: Initiate BVN lookup for upgrade
+  /// Returns session_id and available verification methods
+  Future<BvnInitiateResponse> initiateUpgradeBvn(String bvn) async {
+    final response = await _apiClient.post(
+      ApiEndpoints.upgradeBvnInitiate,
+      data: {'bvn': bvn},
+    );
+    return BvnInitiateResponse.fromJson(response.data);
+  }
+
+  /// Step 2: Select verification method and send OTP for upgrade
+  /// For alternate_phone method, phoneNumber is required
+  Future<BvnVerifyResponse> verifyUpgradeBvnMethod({
+    required String sessionId,
+    required String method,
+    String? phoneNumber,
+  }) async {
+    final data = <String, dynamic>{
+      'sessionId': sessionId,
+      'method': method,
+    };
+    if (method == 'alternate_phone' && phoneNumber != null) {
+      data['phoneNumber'] = phoneNumber;
+    }
+    final response = await _apiClient.post(
+      ApiEndpoints.upgradeBvnVerify,
+      data: data,
+    );
+    return BvnVerifyResponse.fromJson(response.data);
+  }
+
+  /// Step 3: Verify OTP and get BVN details for upgrade
+  /// Returns BVN data and advances to next upgrade step
+  Future<UpgradeBvnDetailsResponse> verifyUpgradeBvnOtp({
+    required String sessionId,
+    required String otp,
+  }) async {
+    final response = await _apiClient.post(
+      ApiEndpoints.upgradeBvnDetails,
+      data: {
+        'sessionId': sessionId,
+        'otp': otp,
+      },
+    );
+    return UpgradeBvnDetailsResponse.fromJson(response.data);
+  }
+
+  // ============================================
   // WALLET BALANCE
   // ============================================
 
@@ -720,6 +1129,38 @@ class WalletRepository {
   /// Delete withdrawal account
   Future<void> deleteWithdrawalAccount() async {
     await _apiClient.delete(ApiEndpoints.withdrawalAccount);
+  }
+
+  // ============================================
+  // INTERNAL WALLET-TO-WALLET TRANSFER
+  // ============================================
+
+  /// Lookup recipient by email or phone number
+  Future<RecipientLookupResponse> lookupRecipient(String identifier) async {
+    final response = await _apiClient.post(
+      ApiEndpoints.walletLookupRecipient,
+      data: {'identifier': identifier},
+    );
+    return RecipientLookupResponse.fromJson(response.data);
+  }
+
+  /// Internal wallet-to-wallet transfer (FinSquare to FinSquare)
+  Future<InternalTransferResponse> internalTransfer({
+    required String recipientUserId,
+    required double amount,
+    String? narration,
+    required String transactionPin,
+  }) async {
+    final response = await _apiClient.post(
+      ApiEndpoints.walletInternalTransfer,
+      data: {
+        'recipientUserId': recipientUserId,
+        'amount': amount,
+        if (narration != null && narration.isNotEmpty) 'narration': narration,
+        'transactionPin': transactionPin,
+      },
+    );
+    return InternalTransferResponse.fromJson(response.data);
   }
 
   // ============================================
@@ -1013,6 +1454,34 @@ class CommunityWalletDetails {
   double get balanceAsDouble => double.tryParse(balance) ?? 0.0;
 }
 
+/// Community Wallet Checklist
+class CommunityWalletChecklist {
+  final bool hasDocuments;
+  final bool hasCoAdmins;
+  final int coAdminCount;
+
+  CommunityWalletChecklist({
+    required this.hasDocuments,
+    required this.hasCoAdmins,
+    required this.coAdminCount,
+  });
+
+  factory CommunityWalletChecklist.fromJson(Map<String, dynamic>? json) {
+    if (json == null) {
+      return CommunityWalletChecklist(
+        hasDocuments: false,
+        hasCoAdmins: false,
+        coAdminCount: 0,
+      );
+    }
+    return CommunityWalletChecklist(
+      hasDocuments: json['hasDocuments'] ?? false,
+      hasCoAdmins: json['hasCoAdmins'] ?? false,
+      coAdminCount: json['coAdminCount'] ?? 0,
+    );
+  }
+}
+
 /// Get Community Wallet Response
 class GetCommunityWalletResponse {
   final bool success;
@@ -1024,6 +1493,7 @@ class GetCommunityWalletResponse {
   final CommunityWalletDetails? wallet;
   final bool canCreate;
   final bool canWithdraw;
+  final CommunityWalletChecklist checklist;
 
   GetCommunityWalletResponse({
     required this.success,
@@ -1035,11 +1505,13 @@ class GetCommunityWalletResponse {
     this.wallet,
     this.canCreate = false,
     this.canWithdraw = false,
+    required this.checklist,
   });
 
   factory GetCommunityWalletResponse.fromJson(Map<String, dynamic> json) {
     final data = json['data'] as Map<String, dynamic>? ?? {};
     final walletJson = data['wallet'] as Map<String, dynamic>?;
+    final checklistJson = data['checklist'] as Map<String, dynamic>?;
 
     return GetCommunityWalletResponse(
       success: json['success'] ?? false,
@@ -1051,6 +1523,79 @@ class GetCommunityWalletResponse {
       wallet: walletJson != null ? CommunityWalletDetails.fromJson(walletJson) : null,
       canCreate: data['canCreate'] ?? false,
       canWithdraw: data['canWithdraw'] ?? false,
+      checklist: CommunityWalletChecklist.fromJson(checklistJson),
+    );
+  }
+}
+
+// ============================================
+// INTERNAL TRANSFER MODELS
+// ============================================
+
+/// Recipient Lookup Response Model
+class RecipientLookupResponse {
+  final bool success;
+  final String? message;
+  final String? userId;
+  final String? fullName;
+  final String? firstName;
+  final String? maskedEmail;
+  final String? maskedPhone;
+  final String? profilePhoto;
+
+  RecipientLookupResponse({
+    required this.success,
+    this.message,
+    this.userId,
+    this.fullName,
+    this.firstName,
+    this.maskedEmail,
+    this.maskedPhone,
+    this.profilePhoto,
+  });
+
+  factory RecipientLookupResponse.fromJson(Map<String, dynamic> json) {
+    final data = json['data'] as Map<String, dynamic>?;
+    return RecipientLookupResponse(
+      success: json['success'] ?? false,
+      message: json['message'],
+      userId: data?['userId'],
+      fullName: data?['fullName'],
+      firstName: data?['firstName'],
+      maskedEmail: data?['maskedEmail'],
+      maskedPhone: data?['maskedPhone'],
+      profilePhoto: data?['profilePhoto'],
+    );
+  }
+}
+
+/// Internal Transfer Response Model
+class InternalTransferResponse {
+  final bool success;
+  final String message;
+  final String? reference;
+  final double? amount;
+  final String? recipientName;
+  final double? newBalance;
+
+  InternalTransferResponse({
+    required this.success,
+    required this.message,
+    this.reference,
+    this.amount,
+    this.recipientName,
+    this.newBalance,
+  });
+
+  factory InternalTransferResponse.fromJson(Map<String, dynamic> json) {
+    final data = json['data'] as Map<String, dynamic>?;
+    return InternalTransferResponse(
+      success: json['success'] ?? false,
+      message: json['message'] ?? '',
+      reference: data?['reference'],
+      amount: data?['amount']?.toDouble(),
+      recipientName: data?['recipientName'],
+      newBalance: data?['newBalance']?.toDouble(),
     );
   }
 }

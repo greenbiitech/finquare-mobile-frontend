@@ -86,28 +86,31 @@ class _ActivateWalletWidgetState extends ConsumerState<_ActivateWalletWidget> {
 
       if (!mounted) return;
 
-      // BVN flow routes require fresh Mono API session - can't resume mid-flow
-      const bvnFlowRoutes = [
+      // BVN/NIN flow routes require fresh Mono API session - can't resume mid-flow
+      const identityFlowRoutes = [
+        AppRoutes.selectVerificationType,
+        AppRoutes.bvnValidation,
+        AppRoutes.ninValidation,
         AppRoutes.selectVerificationMethod,
         AppRoutes.verifyBvnCredentials,
         AppRoutes.verifyOtp,
       ];
 
-      // If there's a resume route and it's not the current page or a BVN flow route, navigate there
+      // If there's a resume route and it's not the current page or an identity flow route, navigate there
       final resumeRoute = progress.resumeRoute;
       if (resumeRoute != null &&
           resumeRoute.isNotEmpty &&
           resumeRoute != AppRoutes.activateWallet &&
-          !bvnFlowRoutes.contains(resumeRoute)) {
+          !identityFlowRoutes.contains(resumeRoute)) {
         context.push(resumeRoute, extra: progress);
       } else {
-        // Start from beginning (BVN validation)
-        context.push(AppRoutes.bvnValidation);
+        // Start from beginning - Select BVN or NIN verification
+        context.push(AppRoutes.selectVerificationType);
       }
     } catch (e) {
       if (!mounted) return;
       // If error fetching progress, just start from beginning
-      context.push(AppRoutes.bvnValidation);
+      context.push(AppRoutes.selectVerificationType);
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);

@@ -3,6 +3,9 @@ import 'package:finsquare_mobile_app/core/network/api_client.dart';
 import 'package:finsquare_mobile_app/core/services/cloudinary_service.dart';
 import 'package:finsquare_mobile_app/features/esusu/data/esusu_repository.dart';
 
+// Re-export CommissionType from repository for convenience
+export 'package:finsquare_mobile_app/features/esusu/data/esusu_repository.dart' show CommissionType;
+
 /// Name availability status
 enum EsusuNameAvailabilityStatus {
   idle,
@@ -38,7 +41,9 @@ class EsusuCreationState {
   final DateTime? participationDeadline;
   final DateTime? collectionDate;
   final bool takeCommission;
-  final int? commissionPercentage;
+  final CommissionType commissionType;
+  final int? commissionPercentage; // For percentage type (5, 10, 15... 50)
+  final double? commissionAmount; // For cash type (fixed amount)
 
   // Screen 4: Participants
   final List<EsusuCommunityMember> availableMembers;
@@ -46,6 +51,9 @@ class EsusuCreationState {
 
   // Screen 5: Payout Order
   final PayoutOrderType? payoutOrderType;
+
+  // Admin's pre-selected slot (for FCFS when admin is participating)
+  final int? adminSelectedSlot;
 
   // Created Esusu (after API call)
   final CreatedEsusu? createdEsusu;
@@ -71,10 +79,13 @@ class EsusuCreationState {
     this.participationDeadline,
     this.collectionDate,
     this.takeCommission = false,
+    this.commissionType = CommissionType.cash,
     this.commissionPercentage,
+    this.commissionAmount,
     this.availableMembers = const [],
     this.selectedParticipants = const [],
     this.payoutOrderType,
+    this.adminSelectedSlot,
     this.createdEsusu,
     this.isLoading = false,
     this.error,
@@ -97,20 +108,25 @@ class EsusuCreationState {
     DateTime? participationDeadline,
     DateTime? collectionDate,
     bool? takeCommission,
+    CommissionType? commissionType,
     int? commissionPercentage,
+    double? commissionAmount,
     List<EsusuCommunityMember>? availableMembers,
     List<EsusuCommunityMember>? selectedParticipants,
     PayoutOrderType? payoutOrderType,
+    int? adminSelectedSlot,
     CreatedEsusu? createdEsusu,
     bool? isLoading,
     String? error,
     bool? isCreated,
     bool clearError = false,
+    bool clearAdminSelectedSlot = false,
     bool clearDescription = false,
     bool clearIconPath = false,
     bool clearIconUrl = false,
     bool clearNameAvailabilityMessage = false,
     bool clearCommissionPercentage = false,
+    bool clearCommissionAmount = false,
   }) {
     return EsusuCreationState(
       communityId: communityId ?? this.communityId,
@@ -132,12 +148,19 @@ class EsusuCreationState {
           participationDeadline ?? this.participationDeadline,
       collectionDate: collectionDate ?? this.collectionDate,
       takeCommission: takeCommission ?? this.takeCommission,
+      commissionType: commissionType ?? this.commissionType,
       commissionPercentage: clearCommissionPercentage
           ? null
           : (commissionPercentage ?? this.commissionPercentage),
+      commissionAmount: clearCommissionAmount
+          ? null
+          : (commissionAmount ?? this.commissionAmount),
       availableMembers: availableMembers ?? this.availableMembers,
       selectedParticipants: selectedParticipants ?? this.selectedParticipants,
       payoutOrderType: payoutOrderType ?? this.payoutOrderType,
+      adminSelectedSlot: clearAdminSelectedSlot
+          ? null
+          : (adminSelectedSlot ?? this.adminSelectedSlot),
       createdEsusu: createdEsusu ?? this.createdEsusu,
       isLoading: isLoading ?? this.isLoading,
       error: clearError ? null : (error ?? this.error),
@@ -158,18 +181,27 @@ class EsusuCreationState {
       nameAvailabilityStatus == EsusuNameAvailabilityStatus.available;
 
   /// Check if configure (Screen 3) is complete
-  bool get isConfigureComplete =>
-      numberOfParticipants != null &&
-      numberOfParticipants! >= 3 &&
-      contributionAmount != null &&
-      contributionAmount! >= 100 &&
-      frequency != null &&
-      participationDeadline != null &&
-      collectionDate != null &&
-      (!takeCommission ||
-          (commissionPercentage != null &&
-              commissionPercentage! >= 1 &&
-              commissionPercentage! <= 50));
+  bool get isConfigureComplete {
+    // Basic requirements
+    if (numberOfParticipants == null || numberOfParticipants! < 3) return false;
+    if (contributionAmount == null || contributionAmount! < 100) return false;
+    if (frequency == null) return false;
+    if (participationDeadline == null) return false;
+    if (collectionDate == null) return false;
+
+    // Commission validation if enabled
+    if (takeCommission) {
+      if (commissionType == CommissionType.percentage) {
+        if (commissionPercentage == null) return false;
+        if (commissionPercentage! < 5 || commissionPercentage! > 50) return false;
+      } else {
+        // Cash type
+        if (commissionAmount == null || commissionAmount! <= 0) return false;
+      }
+    }
+
+    return true;
+  }
 
   /// Check if participants (Screen 4) is complete
   bool get isParticipantsComplete =>
@@ -178,6 +210,16 @@ class EsusuCreationState {
 
   /// Check if payout order (Screen 5) is selected
   bool get isPayoutOrderSelected => payoutOrderType != null;
+
+  /// Check if admin (current user) is participating in the Esusu
+  bool get isAdminParticipating =>
+      selectedParticipants.any((p) => p.isCurrentUser);
+
+  /// Check if admin needs to select slot during creation
+  /// This is true when: (1) Admin is participating AND (2) Payout order is FCFS
+  bool get adminNeedsSlotSelection =>
+      isAdminParticipating &&
+      payoutOrderType == PayoutOrderType.firstComeFirstServed;
 
   /// Calculate total pool
   double get totalPool {
@@ -190,17 +232,24 @@ class EsusuCreationState {
 
   /// Calculate commission
   double get commission {
-    if (!takeCommission || commissionPercentage == null) return 0;
-    return totalPool * commissionPercentage! / 100;
+    if (!takeCommission) return 0;
+
+    if (commissionType == CommissionType.percentage) {
+      if (commissionPercentage == null) return 0;
+      return totalPool * commissionPercentage! / 100;
+    } else {
+      // Cash type - fixed amount
+      return commissionAmount ?? 0;
+    }
   }
 
   /// Calculate net payout per cycle
   double get netPayout => totalPool - platformFee - commission;
 
-  /// Get minimum collection date (participation deadline + 3 days)
+  /// Get minimum collection date (participation deadline + 24 hours)
   DateTime? get minimumCollectionDate {
     if (participationDeadline == null) return null;
-    return participationDeadline!.add(const Duration(days: 3));
+    return participationDeadline!.add(const Duration(hours: 24));
   }
 
   /// Max participants based on community member count
@@ -367,8 +416,8 @@ class EsusuCreationNotifier extends StateNotifier<EsusuCreationState> {
   }
 
   void setParticipationDeadline(DateTime date) {
-    // If collection date is before the new minimum, clear it
-    final minCollectionDate = date.add(const Duration(days: 3));
+    // If collection date is before the new minimum, update it
+    final minCollectionDate = date.add(const Duration(hours: 24));
     if (state.collectionDate != null &&
         state.collectionDate!.isBefore(minCollectionDate)) {
       state = state.copyWith(
@@ -389,9 +438,25 @@ class EsusuCreationNotifier extends StateNotifier<EsusuCreationState> {
       state = state.copyWith(
         takeCommission: false,
         clearCommissionPercentage: true,
+        clearCommissionAmount: true,
       );
     } else {
       state = state.copyWith(takeCommission: true);
+    }
+  }
+
+  void setCommissionType(CommissionType type) {
+    // Clear the other commission value when switching types
+    if (type == CommissionType.cash) {
+      state = state.copyWith(
+        commissionType: type,
+        clearCommissionPercentage: true,
+      );
+    } else {
+      state = state.copyWith(
+        commissionType: type,
+        clearCommissionAmount: true,
+      );
     }
   }
 
@@ -400,6 +465,14 @@ class EsusuCreationNotifier extends StateNotifier<EsusuCreationState> {
       state = state.copyWith(clearCommissionPercentage: true);
     } else {
       state = state.copyWith(commissionPercentage: percentage);
+    }
+  }
+
+  void setCommissionAmount(double? amount) {
+    if (amount == null) {
+      state = state.copyWith(clearCommissionAmount: true);
+    } else {
+      state = state.copyWith(commissionAmount: amount);
     }
   }
 
@@ -481,7 +554,23 @@ class EsusuCreationNotifier extends StateNotifier<EsusuCreationState> {
   // =====================
 
   void setPayoutOrderType(PayoutOrderType type) {
-    state = state.copyWith(payoutOrderType: type);
+    // Clear admin slot if switching away from FCFS
+    if (type != PayoutOrderType.firstComeFirstServed) {
+      state = state.copyWith(
+        payoutOrderType: type,
+        clearAdminSelectedSlot: true,
+      );
+    } else {
+      state = state.copyWith(payoutOrderType: type);
+    }
+  }
+
+  void setAdminSelectedSlot(int? slot) {
+    if (slot == null) {
+      state = state.copyWith(clearAdminSelectedSlot: true);
+    } else {
+      state = state.copyWith(adminSelectedSlot: slot);
+    }
   }
 
   // =====================
@@ -539,12 +628,18 @@ class EsusuCreationNotifier extends StateNotifier<EsusuCreationState> {
         participationDeadline: state.participationDeadline!,
         collectionDate: state.collectionDate!,
         takeCommission: state.takeCommission,
-        commissionPercentage:
-            state.takeCommission ? state.commissionPercentage : null,
+        commissionType: state.takeCommission ? state.commissionType : null,
+        commissionPercentage: state.takeCommission && state.commissionType == CommissionType.percentage
+            ? state.commissionPercentage
+            : null,
+        commissionAmount: state.takeCommission && state.commissionType == CommissionType.cash
+            ? state.commissionAmount
+            : null,
         payoutOrderType: state.payoutOrderType!,
         participants: state.selectedParticipants
             .map((m) => EsusuParticipant(userId: m.id))
             .toList(),
+        adminSlot: state.adminSelectedSlot,
       );
 
       final response = await _repository.createEsusu(request);

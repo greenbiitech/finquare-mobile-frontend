@@ -3,10 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:timeago/timeago.dart' as timeago;
 import 'package:finsquare_mobile_app/config/theme/app_theme.dart';
 import 'package:finsquare_mobile_app/config/routes/app_router.dart';
 import 'package:finsquare_mobile_app/features/community/presentation/providers/community_provider.dart';
 import 'package:finsquare_mobile_app/features/esusu/data/esusu_repository.dart';
+import 'package:finsquare_mobile_app/features/contributions/data/contributions_repository.dart';
+import 'package:finsquare_mobile_app/features/notifications/data/notifications_repository.dart';
+import 'package:finsquare_mobile_app/features/notifications/presentation/providers/notifications_provider.dart';
 
 // Colors matching old Greencard codebase
 const Color _greyBackground = Color(0xFFF3F3F3);
@@ -38,6 +42,7 @@ class HubPage extends ConsumerStatefulWidget {
 class _HubPageState extends ConsumerState<HubPage> {
   final bool _isLoading = false;
   int _esusuCount = 0;
+  int _contributionsCount = 0;
   String? _lastCommunityId;
   int _lastRefreshTrigger = 0;
   bool _wasVisible = false;
@@ -48,6 +53,7 @@ class _HubPageState extends ConsumerState<HubPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _lastRefreshTrigger = ref.read(hubRefreshTriggerProvider);
       _fetchEsusuCount();
+      _fetchContributionsCount();
     });
   }
 
@@ -65,6 +71,7 @@ class _HubPageState extends ConsumerState<HubPage> {
   void _forceRefresh() {
     _lastCommunityId = null;
     _fetchEsusuCount();
+    _fetchContributionsCount();
   }
 
   Future<void> _fetchEsusuCount() async {
@@ -92,6 +99,41 @@ class _HubPageState extends ConsumerState<HubPage> {
         setState(() => _esusuCount = 0);
       }
     }
+
+    // Also fetch activity notifications
+    _fetchActivityNotifications(communityId);
+  }
+
+  Future<void> _fetchContributionsCount() async {
+    final communityState = ref.read(communityProvider);
+    final communityId = communityState.activeCommunity?.id;
+
+    if (communityId == null || communityState.activeCommunity?.isDefault == true) {
+      setState(() => _contributionsCount = 0);
+      return;
+    }
+
+    try {
+      final repository = ref.read(contributionsRepositoryProvider);
+      final response = await repository.getHubCount(communityId);
+      if (mounted) {
+        setState(() => _contributionsCount = response.total);
+      }
+    } catch (e) {
+      // Silently fail - keep count at 0
+      if (mounted) {
+        setState(() => _contributionsCount = 0);
+      }
+    }
+  }
+
+  Future<void> _fetchActivityNotifications(String communityId) async {
+    print('[HubPage] _fetchActivityNotifications called with communityId: $communityId');
+    try {
+      await ref.read(hubActivityProvider.notifier).fetchNotifications(communityId);
+    } catch (e) {
+      print('[HubPage] Error fetching activity notifications: $e');
+    }
   }
 
   @override
@@ -109,26 +151,31 @@ class _HubPageState extends ConsumerState<HubPage> {
     final communityName = activeCommunity?.name ?? 'FinSquare Community';
     final memberCount = activeCommunity?.memberCount ?? 0;
     final communityLogo = activeCommunity?.logo;
+    final isDefaultCommunity = activeCommunity?.isDefault == true;
 
-    // Re-fetch Esusu count when community changes
+    // Re-fetch counts when community changes
     if (activeCommunity?.id != _lastCommunityId) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _fetchEsusuCount();
+        _fetchContributionsCount();
       });
     }
 
     return Scaffold(
       backgroundColor: Colors.white,
-      floatingActionButton: FloatingActionButton(
-        heroTag: 'hub_fab',
-        backgroundColor: AppColors.primary,
-        onPressed: () {
-          context.push(AppRoutes.createHub);
-        },
-        elevation: 8,
-        shape: const CircleBorder(),
-        child: const Icon(Icons.add, color: Colors.white, size: 28),
-      ),
+      // Hide FAB for users in default community (they can't create community features)
+      floatingActionButton: isDefaultCommunity
+          ? null
+          : FloatingActionButton(
+              heroTag: 'hub_fab',
+              backgroundColor: AppColors.primary,
+              onPressed: () {
+                context.push(AppRoutes.createHub);
+              },
+              elevation: 8,
+              shape: const CircleBorder(),
+              child: const Icon(Icons.add, color: Colors.white, size: 28),
+            ),
       body: SafeArea(
         child: _isLoading
             ? _buildShimmerEffect()
@@ -138,34 +185,40 @@ class _HubPageState extends ConsumerState<HubPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: 16),
-                    // Community header with shadow underneath
-                    Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        // Shadow element positioned behind
-                        Positioned(
-                          top: 55,
-                          left: 10,
-                          right: 10,
-                          child: Container(
-                            width: 340,
-                            height: 35,
-                            decoration: BoxDecoration(
-                              color: _communityBorderColor,
-                              borderRadius: BorderRadius.circular(8),
+                    // Only show community header for non-default communities
+                    if (!isDefaultCommunity) ...[
+                      // Community header with shadow underneath
+                      Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          // Shadow element positioned behind
+                          Positioned(
+                            top: 55,
+                            left: 10,
+                            right: 10,
+                            child: Container(
+                              width: 340,
+                              height: 35,
+                              decoration: BoxDecoration(
+                                color: _communityBorderColor,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
                             ),
                           ),
-                        ),
-                        // Community header on top
-                        _buildCommunityHeader(communityName, memberCount, communityLogo),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    _buildCommunityFinanceSection(),
-                    const SizedBox(height: 24),
+                          // Community header on top
+                          _buildCommunityHeader(communityName, memberCount, communityLogo),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+                      _buildCommunityFinanceSection(),
+                      const SizedBox(height: 24),
+                    ],
                     _buildPersonalSavingsSection(),
-                    const SizedBox(height: 24),
-                    _buildActivitySection(),
+                    // Only show activity section for non-default communities
+                    if (!isDefaultCommunity) ...[
+                      const SizedBox(height: 24),
+                      _buildActivitySection(),
+                    ],
                     const SizedBox(height: 100), // Space for FAB and bottom nav
                   ],
                 ),
@@ -439,7 +492,7 @@ class _HubPageState extends ConsumerState<HubPage> {
           children: [
             _buildFinanceItem('Esusu', 'assets/svgs/hub/esusu.svg', _esusuCount, _esusuBgColor, _esusuTextColor, onTap: () => context.push(AppRoutes.esusuList)),
             _buildFinanceItem('Dues', 'assets/svgs/hub/dues.svg', 0, _duesBgColor, _duesTextColor),
-            _buildFinanceItem('Contributions', 'assets/svgs/hub/contributions.svg', 0, _contributionsBgColor, _contributionsTextColor),
+            _buildFinanceItem('Contributions', 'assets/svgs/hub/contributions.svg', _contributionsCount, _contributionsBgColor, _contributionsTextColor, onTap: () => context.push(AppRoutes.contributionsList)),
             _buildFinanceItem('Group Buying', 'assets/svgs/hub/group_buying.svg', 0, _groupBuyBgColor, _groupBuyTextColor),
           ],
         ),
@@ -596,60 +649,300 @@ class _HubPageState extends ConsumerState<HubPage> {
     );
   }
 
-  /// Activity section - matching old design
+  /// Activity section - displays in-app notifications
   Widget _buildActivitySection() {
+    final activityState = ref.watch(hubActivityProvider);
+    final communityState = ref.watch(communityProvider);
+    final communityId = communityState.activeCommunity?.id;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Activity',
-          style: TextStyle(
-            fontFamily: AppTextStyles.fontFamily,
-            fontWeight: FontWeight.w600,
-            fontSize: 16,
-            color: _mainTextColor,
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Activity',
+              style: TextStyle(
+                fontFamily: AppTextStyles.fontFamily,
+                fontWeight: FontWeight.w600,
+                fontSize: 16,
+                color: _mainTextColor,
+              ),
+            ),
+            if (activityState.notifications.isNotEmpty)
+              GestureDetector(
+                onTap: () {
+                  if (communityId != null) {
+                    context.push('${AppRoutes.hubNotifications}/$communityId');
+                  }
+                },
+                child: Text(
+                  'View All',
+                  style: TextStyle(
+                    fontFamily: AppTextStyles.fontFamily,
+                    fontSize: 12,
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+          ],
         ),
         const SizedBox(height: 16),
-        // Empty state
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(40),
-          decoration: BoxDecoration(
-            color: _greyBackground,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey.shade300, width: 1),
-          ),
-          child: Column(
-            children: [
-              Icon(
-                Icons.timeline_outlined,
-                size: 48,
-                color: Colors.grey.shade400,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'No activities yet',
-                style: TextStyle(
-                  fontFamily: AppTextStyles.fontFamily,
-                  fontSize: 16,
-                  color: Colors.grey.shade600,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Activities will appear here when available',
-                style: TextStyle(
-                  fontFamily: AppTextStyles.fontFamily,
-                  fontSize: 14,
-                  color: Colors.grey.shade500,
-                ),
-              ),
-            ],
-          ),
-        ),
+        if (activityState.isLoading)
+          _buildActivityShimmer()
+        else if (activityState.notifications.isEmpty)
+          _buildEmptyActivityState()
+        else
+          _buildActivityList(activityState.notifications),
       ],
     );
+  }
+
+  Widget _buildActivityShimmer() {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey[300]!,
+      highlightColor: Colors.grey[100]!,
+      child: Column(
+        children: List.generate(
+          2,
+          (index) => Padding(
+            padding: EdgeInsets.only(bottom: index < 1 ? 12 : 0),
+            child: Container(
+              height: 80,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyActivityState() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(40),
+      decoration: BoxDecoration(
+        color: _greyBackground,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade300, width: 1),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            Icons.timeline_outlined,
+            size: 48,
+            color: Colors.grey.shade400,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'No activities yet',
+            style: TextStyle(
+              fontFamily: AppTextStyles.fontFamily,
+              fontSize: 16,
+              color: Colors.grey.shade600,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Activities will appear here when available',
+            style: TextStyle(
+              fontFamily: AppTextStyles.fontFamily,
+              fontSize: 14,
+              color: Colors.grey.shade500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActivityList(List<InAppNotification> notifications) {
+    return Column(
+      children: notifications.asMap().entries.map((entry) {
+        final index = entry.key;
+        final notification = entry.value;
+        return Padding(
+          padding: EdgeInsets.only(bottom: index < notifications.length - 1 ? 12 : 0),
+          child: _buildActivityItem(notification),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildActivityItem(InAppNotification notification) {
+    // Get feature-specific colors
+    Color bgColor;
+    Color textColor;
+    String iconPath;
+
+    switch (notification.feature) {
+      case NotificationFeature.esusu:
+        bgColor = _esusuBgColor;
+        textColor = _esusuTextColor;
+        iconPath = 'assets/svgs/hub/esusu.svg';
+        break;
+      case NotificationFeature.dues:
+        bgColor = _duesBgColor;
+        textColor = _duesTextColor;
+        iconPath = 'assets/svgs/hub/dues.svg';
+        break;
+      case NotificationFeature.contributions:
+        bgColor = _contributionsBgColor;
+        textColor = _contributionsTextColor;
+        iconPath = 'assets/svgs/hub/contributions.svg';
+        break;
+      case NotificationFeature.groupBuying:
+        bgColor = _groupBuyBgColor;
+        textColor = _groupBuyTextColor;
+        iconPath = 'assets/svgs/hub/group_buying.svg';
+        break;
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: _greyBackground,
+        borderRadius: BorderRadius.circular(12),
+        border: notification.isRead
+            ? null
+            : Border.all(color: textColor.withValues(alpha: 0.3), width: 1),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Icon
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: bgColor,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Center(
+              child: SvgPicture.asset(
+                iconPath,
+                width: 24,
+                height: 24,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          // Content
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  notification.title,
+                  style: TextStyle(
+                    fontFamily: AppTextStyles.fontFamily,
+                    fontSize: 14,
+                    fontWeight: notification.isRead ? FontWeight.w500 : FontWeight.w600,
+                    color: _mainTextColor,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  timeago.format(notification.createdAt),
+                  style: TextStyle(
+                    fontFamily: AppTextStyles.fontFamily,
+                    fontSize: 12,
+                    color: Colors.grey.shade500,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                // View button
+                GestureDetector(
+                  onTap: () => _handleNotificationTap(notification),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: bgColor,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Text(
+                      'View',
+                      style: TextStyle(
+                        fontFamily: AppTextStyles.fontFamily,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: textColor,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Handle notification tap - navigate based on notification type
+  void _handleNotificationTap(InAppNotification notification) async {
+    // Mark as read
+    await ref.read(hubActivityProvider.notifier).markAsRead(notification.id);
+
+    if (!mounted) return;
+
+    // Navigate based on feature and type
+    if (notification.feature == NotificationFeature.esusu) {
+      final esusuId = notification.esusuId;
+      final esusuName = notification.esusuName ?? 'Esusu';
+
+      if (esusuId == null) return;
+
+      // Determine where to navigate based on notification type
+      switch (notification.type) {
+        case 'esusu_invite':
+        case 'esusu_reminder':
+          // Pending invitation - go to invitation page
+          context.push(
+            '${AppRoutes.esusuInvitation}/$esusuId?name=${Uri.encodeComponent(esusuName)}',
+          );
+          break;
+        case 'esusu_joined':
+        case 'esusu_ready':
+        case 'esusu_invite_accepted':
+        case 'esusu_invite_declined':
+          // Accepted/Ready - go to waiting room
+          context.push(
+            '${AppRoutes.esusuWaitingRoom}/$esusuId?name=${Uri.encodeComponent(esusuName)}',
+          );
+          break;
+        case 'esusu_created':
+        case 'esusu_cancelled':
+        case 'esusu_invitation_expired':
+          // General - go to Esusu list
+          context.push(AppRoutes.esusuList);
+          break;
+        default:
+          // Default - go to Esusu detail or list
+          context.push(
+            '${AppRoutes.esusuDetail}/$esusuId?name=${Uri.encodeComponent(esusuName)}',
+          );
+      }
+    } else if (notification.feature == NotificationFeature.contributions) {
+      final contributionId = notification.contributionId;
+
+      if (contributionId == null) {
+        // No specific contribution - go to list
+        context.push(AppRoutes.contributionsList);
+        return;
+      }
+
+      // Navigate to contribution detail
+      context.push('${AppRoutes.contributionDetail}/$contributionId');
+    }
+    // TODO: Add navigation for other features (dues, group buying)
   }
 }

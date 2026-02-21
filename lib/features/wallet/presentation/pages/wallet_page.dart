@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
@@ -43,6 +44,16 @@ final communityWalletStatusProvider = FutureProvider.autoDispose.family<GetCommu
   final repository = ref.watch(walletRepositoryProvider);
   try {
     return await repository.getCommunityWallet(communityId);
+  } catch (e) {
+    return null;
+  }
+});
+
+/// Provider for wallet upgrade status
+final upgradeStatusProvider = FutureProvider.autoDispose<UpgradeStatusResponse?>((ref) async {
+  final repository = ref.watch(walletRepositoryProvider);
+  try {
+    return await repository.getUpgradeStatus();
   } catch (e) {
     return null;
   }
@@ -124,6 +135,20 @@ class _WalletPageState extends ConsumerState<WalletPage> {
     showWithdrawalModal(context);
   }
 
+  void _onTransfer() {
+    context.push(AppRoutes.walletTransfer);
+  }
+
+  void _copyAccountNumber(String accountNumber) {
+    Clipboard.setData(ClipboardData(text: accountNumber));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Account number copied'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
   /// Check if community tab should be visible
   /// Only show for Admin/Co-Admin and not for default FinSquare Community
   bool _shouldShowCommunityTab(CommunityState communityState) {
@@ -174,12 +199,15 @@ class _WalletPageState extends ConsumerState<WalletPage> {
                   // Content based on selected tab
                   if (_selectedTab == WalletTab.personal) ...[
                     // Personal Wallet Content
-                    // Wallet Balance Container - matching old design exactly
+                    // Wallet Balance Container
                     walletState.isFirstLoad && walletState.isLoading
                         ? _buildWalletBalanceShimmer()
                         : _buildWalletBalanceContainer(walletState),
+                    const SizedBox(height: 16),
+                    // Upgrade to Tier 2 prompt card
+                    _buildUpgradePromptCard(),
                     const SizedBox(height: 20),
-                    // Transactions Header - matching old design
+                    // Transactions Header
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -366,11 +394,14 @@ class _WalletPageState extends ConsumerState<WalletPage> {
   Widget _buildCommunityWalletDashboard(GetCommunityWalletResponse walletResponse) {
     final wallet = walletResponse.wallet!;
     final balance = wallet.balanceAsDouble;
+    final checklist = walletResponse.checklist;
+    final communityState = ref.watch(communityProvider);
+    final isAdmin = communityState.activeCommunity?.isAdmin ?? false;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Balance Container
+        // Balance Card - matching Figma design
         Container(
           padding: const EdgeInsets.all(20),
           width: double.infinity,
@@ -382,92 +413,259 @@ class _WalletPageState extends ConsumerState<WalletPage> {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Text(
-                'Community Wallet Balance',
+                'Wallet Balance',
                 style: TextStyle(
                   fontFamily: AppTextStyles.fontFamily,
                   fontSize: 12,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w500,
                   color: _greyIconColor,
                 ),
               ),
-              const SizedBox(height: 20),
-              Text(
-                '₦${balance.toStringAsFixed(2)}',
-                style: TextStyle(
-                  fontFamily: AppTextStyles.fontFamily,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 24,
-                  color: Colors.black,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                decoration: BoxDecoration(
-                  color: wallet.isActive ? Colors.green.withValues(alpha: 0.1) : Colors.orange.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  wallet.isActive ? 'Active' : 'Inactive',
-                  style: TextStyle(
-                    fontFamily: AppTextStyles.fontFamily,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: wallet.isActive ? Colors.green : Colors.orange,
+              const SizedBox(height: 12),
+              // Balance with visibility toggle
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Text(
+                    _isBalanceVisible
+                        ? '₦${balance.toStringAsFixed(2).split('.')[0]}'
+                        : '₦****',
+                    style: TextStyle(
+                      fontFamily: AppTextStyles.fontFamily,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 24,
+                      color: Colors.black,
+                    ),
                   ),
-                ),
+                  if (_isBalanceVisible)
+                    Text(
+                      '.${balance.toStringAsFixed(2).split('.')[1]}',
+                      style: TextStyle(
+                        fontFamily: AppTextStyles.fontFamily,
+                        fontWeight: FontWeight.w500,
+                        fontSize: 14,
+                        color: Colors.black,
+                      ),
+                    ),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _isBalanceVisible = !_isBalanceVisible;
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE0E0E0),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        _isBalanceVisible
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                        size: 18,
+                        color: _greyIconColor,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              const Divider(height: 1, color: Color(0xFFE0E0E0)),
+              const SizedBox(height: 16),
+              // Withdraw Button only
+              _buildActionButton(
+                svgPath: 'assets/svgs/withdraw.svg',
+                label: 'Withdraw',
+                onTap: () {
+                  // TODO: Implement community wallet withdrawal
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Community withdrawal coming soon')),
+                  );
+                },
               ),
             ],
           ),
         ),
+        const SizedBox(height: 24),
+
+        // Wallet Checklist Section - Only for Admins
+        if (isAdmin) ...[
+          Text(
+            'Wallet Checklist',
+            style: TextStyle(
+              fontFamily: AppTextStyles.fontFamily,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: _mainTextColor,
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Checklist Cards - Horizontal Scroll
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                // Upload Community Documents Card
+                _buildChecklistCard(
+                  title: 'Upload Community Documents',
+                  isDone: checklist.hasDocuments,
+                  onTap: () {
+                    // TODO: Navigate to upload documents
+                  },
+                ),
+                const SizedBox(width: 12),
+                // Add Co-admins Card
+                _buildChecklistCard(
+                  title: 'Add Co-admins',
+                  isDone: checklist.hasCoAdmins,
+                  onTap: () {
+                    // TODO: Navigate to add co-admins
+                  },
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+        ],
+
+        // Transactions Section
+        _buildCommunityTransactionsList(),
+      ],
+    );
+  }
+
+  /// Build checklist card widget
+  Widget _buildChecklistCard({
+    required String title,
+    required bool isDone,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFFE8E8E8)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              maxLines: 1,
+              style: TextStyle(
+                fontFamily: AppTextStyles.fontFamily,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: _mainTextColor,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: isDone
+                    ? Colors.green.withValues(alpha: 0.1)
+                    : const Color(0xFFFFF3E0),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                isDone ? 'Done' : 'Not Done',
+                style: TextStyle(
+                  fontFamily: AppTextStyles.fontFamily,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: isDone ? Colors.green : const Color(0xFFE65100),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Build community transactions list (empty state with shimmer placeholders)
+  Widget _buildCommunityTransactionsList() {
+    // TODO: Implement actual community transaction fetching
+    // For now showing empty state with shimmer placeholders
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
         const SizedBox(height: 20),
-        // Signatories Section
         Text(
-          'Signatories',
+          'No Transactions yet',
           style: TextStyle(
             fontFamily: AppTextStyles.fontFamily,
+            fontSize: 16,
             fontWeight: FontWeight.w700,
-            fontSize: 14,
             color: _mainTextColor,
           ),
         ),
-        const SizedBox(height: 12),
-        ...wallet.signatories.map((signatory) => _buildSignatoryTile(signatory)),
-        const SizedBox(height: 20),
-        // Approval Rule Section
-        Container(
-          padding: const EdgeInsets.all(16),
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: _greyBackground,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Approval Rule',
-                style: TextStyle(
-                  fontFamily: AppTextStyles.fontFamily,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: _greyIconColor,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                _formatApprovalRule(wallet.approvalRule),
-                style: TextStyle(
-                  fontFamily: AppTextStyles.fontFamily,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: _mainTextColor,
-                ),
-              ),
-            ],
+        const SizedBox(height: 8),
+        Text(
+          'Your transactions will show here',
+          style: TextStyle(
+            fontFamily: AppTextStyles.fontFamily,
+            fontSize: 13,
+            fontWeight: FontWeight.w400,
+            color: _greyTextColor,
           ),
         ),
+        const SizedBox(height: 24),
+        // Shimmer placeholders
+        ...List.generate(3, (index) => _buildTransactionPlaceholder()),
       ],
+    );
+  }
+
+  /// Build transaction placeholder row (grey boxes)
+  Widget _buildTransactionPlaceholder() {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      decoration: const BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: Color(0xFFF4F4F4), width: 1),
+        ),
+      ),
+      child: Row(
+        children: [
+          // Icon placeholder
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE8E8E8),
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+          const SizedBox(width: 12),
+          // Text placeholder
+          Container(
+            width: 80,
+            height: 14,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE8E8E8),
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+          const Spacer(),
+          // Amount placeholder
+          Container(
+            width: 60,
+            height: 14,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE8E8E8),
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -539,7 +737,7 @@ class _WalletPageState extends ConsumerState<WalletPage> {
     }
   }
 
-  /// Shimmer loading state for wallet balance - matching old design
+  /// Shimmer loading state for wallet balance
   Widget _buildWalletBalanceShimmer() {
     return Shimmer.fromColors(
       baseColor: Colors.grey.shade300,
@@ -554,18 +752,24 @@ class _WalletPageState extends ConsumerState<WalletPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Wallet Balance Label Shimmer
-            Container(height: 12, width: 100, color: Colors.white),
-            const SizedBox(height: 20),
+            // Header row shimmer
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(height: 12, width: 80, color: Colors.white),
+                Container(height: 12, width: 100, color: Colors.white),
+              ],
+            ),
+            const SizedBox(height: 16),
             // Balance Amount Shimmer
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Container(height: 24, width: 120, color: Colors.white),
-                const SizedBox(width: 10),
+                const SizedBox(width: 8),
                 Container(
-                  height: 30,
-                  width: 30,
+                  height: 26,
+                  width: 26,
                   decoration: const BoxDecoration(
                     shape: BoxShape.circle,
                     color: Colors.white,
@@ -573,24 +777,52 @@ class _WalletPageState extends ConsumerState<WalletPage> {
                 ),
               ],
             ),
-            const Divider(),
-            const SizedBox(height: 7),
-            // Action Buttons Shimmer
+            const SizedBox(height: 16),
+            const Divider(height: 1),
+            const SizedBox(height: 16),
+            // Action Buttons Shimmer - 3 buttons
             Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 Column(
                   children: [
-                    Container(height: 24, width: 24, color: Colors.white),
-                    const SizedBox(height: 4),
+                    Container(
+                      height: 50,
+                      width: 50,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
                     Container(height: 10, width: 50, color: Colors.white),
                   ],
                 ),
-                const SizedBox(width: 40),
                 Column(
                   children: [
-                    Container(height: 24, width: 24, color: Colors.white),
-                    const SizedBox(height: 4),
+                    Container(
+                      height: 50,
+                      width: 50,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(height: 10, width: 50, color: Colors.white),
+                  ],
+                ),
+                Column(
+                  children: [
+                    Container(
+                      height: 50,
+                      width: 50,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
                     Container(height: 10, width: 60, color: Colors.white),
                   ],
                 ),
@@ -602,7 +834,7 @@ class _WalletPageState extends ConsumerState<WalletPage> {
     );
   }
 
-  /// Wallet balance container - matching old design
+  /// Wallet balance container - Figma design
   Widget _buildWalletBalanceContainer(WalletState walletState) {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -614,34 +846,63 @@ class _WalletPageState extends ConsumerState<WalletPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Wallet Balance label - centered like old design
+          // Header row: Wallet Balance label left, Account number right
           Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Wallet Balance',
-                style: TextStyle(
-                  fontFamily: AppTextStyles.fontFamily,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: _greyIconColor,
-                ),
+              Row(
+                children: [
+                  Text(
+                    'Wallet Balance',
+                    style: TextStyle(
+                      fontFamily: AppTextStyles.fontFamily,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: _greyIconColor,
+                    ),
+                  ),
+                  if (walletState.isLoading && !walletState.isFirstLoad) ...[
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      width: 12,
+                      height: 12,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(_greyIconColor),
+                      ),
+                    ),
+                  ],
+                ],
               ),
-              if (walletState.isLoading && !walletState.isFirstLoad) ...[
-                const SizedBox(width: 8),
-                SizedBox(
-                  width: 12,
-                  height: 12,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(_greyIconColor),
+              // Account number with copy icon
+              if (walletState.accountNumber.isNotEmpty)
+                GestureDetector(
+                  onTap: () => _copyAccountNumber(walletState.accountNumber),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        walletState.accountNumber,
+                        style: TextStyle(
+                          fontFamily: AppTextStyles.fontFamily,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: _mainTextColor,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Icon(
+                        Icons.copy_outlined,
+                        size: 16,
+                        color: _greyIconColor,
+                      ),
+                    ],
                   ),
                 ),
-              ],
             ],
           ),
-          const SizedBox(height: 20),
-          // Balance display with visibility toggle - matching old design
+          const SizedBox(height: 16),
+          // Balance display with visibility toggle
           walletState.error != null && walletState.balance == '0.00'
               ? Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -684,109 +945,170 @@ class _WalletPageState extends ConsumerState<WalletPage> {
                               fontSize: 24,
                             ),
                           ),
-                    const SizedBox(width: 10),
-                    // Visibility toggle button - matching old design
-                    Container(
-                      height: 30,
-                      width: 30,
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Color(0xFFE8E8E8),
-                      ),
-                      alignment: Alignment.center,
-                      child: FittedBox(
-                        child: IconButton(
-                          icon: Icon(
-                            _isBalanceVisible
-                                ? Icons.visibility_outlined
-                                : Icons.visibility_off_outlined,
-                            color: Colors.black,
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _isBalanceVisible = !_isBalanceVisible;
-                            });
-                          },
+                    const SizedBox(width: 8),
+                    // Visibility toggle - simple icon button
+                    GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _isBalanceVisible = !_isBalanceVisible;
+                        });
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE0E0E0),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          _isBalanceVisible
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
+                          size: 18,
+                          color: _greyIconColor,
                         ),
                       ),
                     ),
                   ],
                 ),
-          const Divider(),
-          const SizedBox(height: 7),
-          // Action buttons - Top Up and Withdraw - matching old design
+          const SizedBox(height: 16),
+          const Divider(height: 1, color: Color(0xFFE0E0E0)),
+          const SizedBox(height: 16),
+          // Action buttons - Top Up, Transfer, Withdraw
           Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
               // Top Up Button
-              InkWell(
+              _buildActionButton(
+                svgPath: 'assets/svgs/topup.svg',
+                label: 'Top Up',
                 onTap: _onTopUp,
-                child: Column(
-                  children: [
-                    // Using icon similar to old SVG style
-                    Container(
-                      height: 40,
-                      width: 40,
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.15),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.add,
-                        color: AppColors.primary,
-                        size: 24,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Top Up',
-                      style: TextStyle(
-                        fontFamily: AppTextStyles.fontFamily,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 10,
-                        color: _greyTextColor,
-                      ),
-                    ),
-                  ],
-                ),
               ),
-              const SizedBox(width: 40),
+              // Transfer Button
+              _buildActionButton(
+                svgPath: 'assets/svgs/transfer.svg',
+                label: 'Transfer',
+                onTap: _onTransfer,
+              ),
               // Withdraw Button
-              InkWell(
+              _buildActionButton(
+                svgPath: 'assets/svgs/withdraw.svg',
+                label: 'Withdraw',
                 onTap: _onWithdraw,
-                child: Column(
-                  children: [
-                    // Using icon similar to old SVG style
-                    Container(
-                      height: 40,
-                      width: 40,
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.15),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.arrow_upward,
-                        color: AppColors.primary,
-                        size: 24,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Withdraw',
-                      style: TextStyle(
-                        fontFamily: AppTextStyles.fontFamily,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 10,
-                        color: _greyTextColor,
-                      ),
-                    ),
-                  ],
-                ),
               ),
             ],
           ),
         ],
       ),
+    );
+  }
+
+  /// Build action button widget (Top Up, Transfer, Withdraw)
+  Widget _buildActionButton({
+    required String svgPath,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(30),
+      child: Column(
+        children: [
+          SvgPicture.asset(
+            svgPath,
+            width: 50,
+            height: 50,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: TextStyle(
+              fontFamily: AppTextStyles.fontFamily,
+              fontWeight: FontWeight.w500,
+              fontSize: 12,
+              color: _greyTextColor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Build the upgrade prompt card (dynamic based on current tier)
+  Widget _buildUpgradePromptCard() {
+    final upgradeStatusAsync = ref.watch(upgradeStatusProvider);
+
+    return upgradeStatusAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (status) {
+        if (status == null) return const SizedBox.shrink();
+
+        // Determine what to show based on current tier
+        String? upgradeText;
+        if (status.currentTier == 'TIER_1' && status.canUpgradeToTier2) {
+          upgradeText = 'Upgrade to Tier 2';
+        } else if (status.currentTier == 'TIER_2' && status.canUpgradeToTier3) {
+          upgradeText = 'Upgrade to Tier 3';
+        } else if (status.currentTier == 'TIER_3') {
+          // Already at max tier, don't show upgrade card
+          return const SizedBox.shrink();
+        } else if (status.isUpgradeInProgress) {
+          upgradeText = 'Continue Upgrade';
+        } else if (status.isPendingApproval) {
+          upgradeText = 'Upgrade Pending Approval';
+        }
+
+        if (upgradeText == null) return const SizedBox.shrink();
+
+        return GestureDetector(
+          onTap: () {
+            // Navigate to wallet upgrade flow
+            context.push(AppRoutes.walletUpgrade);
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: _greyBackground,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Todo',
+                        style: TextStyle(
+                          fontFamily: AppTextStyles.fontFamily,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w400,
+                          color: _greyTextColor,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        upgradeText,
+                        style: TextStyle(
+                          fontFamily: AppTextStyles.fontFamily,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: _mainTextColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.chevron_right,
+                  color: _greyIconColor,
+                  size: 24,
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 

@@ -18,6 +18,7 @@ class DefaultButton extends StatelessWidget {
     this.border,
     this.fontWeight,
     this.loading = false,
+    this.loadingIndicatorColor,
   });
 
   final bool isButtonEnabled;
@@ -34,6 +35,7 @@ class DefaultButton extends StatelessWidget {
   final BorderSide? border;
   final double fontSize;
   final FontWeight? fontWeight;
+  final Color? loadingIndicatorColor;
 
   @override
   Widget build(BuildContext context) {
@@ -60,7 +62,7 @@ class DefaultButton extends StatelessWidget {
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
                   valueColor: AlwaysStoppedAnimation<Color>(
-                    titleColor ?? Colors.white,
+                    loadingIndicatorColor ?? titleColor ?? Colors.white,
                   ),
                 ),
               )

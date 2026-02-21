@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_confetti/flutter_confetti.dart';
 import 'package:go_router/go_router.dart';
+import 'package:finsquare_mobile_app/config/routes/app_router.dart';
 import 'package:finsquare_mobile_app/config/theme/app_theme.dart';
 import 'package:finsquare_mobile_app/core/services/snackbar_service.dart';
 import 'package:finsquare_mobile_app/core/widgets/back_button.dart';
@@ -395,7 +396,9 @@ class _CommunityWalletSetupPageState
     }
 
     if (_coAdmins.isEmpty) {
-      showWarningSnackbar('No co-admins available. Please add co-admins to your community first.');
+      // Redirect to members page where admin can add co-admins
+      showWarningSnackbar('No co-admins available. Redirecting to add co-admins...');
+      context.push('${AppRoutes.communityMembersList}/${widget.communityId}');
       return;
     }
 

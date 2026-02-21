@@ -187,10 +187,11 @@ class _EsusuInvitationPageState extends ConsumerState<EsusuInvitationPage> {
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             child: Text(
-              'Decline',
+              'Yes, Decline',
               style: TextStyle(
                 fontFamily: AppTextStyles.fontFamily,
                 color: Colors.red,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ),
@@ -204,19 +205,28 @@ class _EsusuInvitationPageState extends ConsumerState<EsusuInvitationPage> {
 
     try {
       final repository = ref.read(esusuRepositoryProvider);
-      await repository.respondToInvitation(widget.esusuId, accept: false);
+      final response = await repository.respondToInvitation(widget.esusuId, accept: false);
 
       if (mounted) {
-        // Trigger list refresh for when user returns to list
+        // Trigger list and hub refresh
         ref.read(esusuListRefreshTriggerProvider.notifier).state++;
+        ref.read(hubRefreshTriggerProvider.notifier).state++;
 
+        // Show appropriate message
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Invitation declined'),
-            backgroundColor: Colors.grey,
+          SnackBar(
+            content: Text(
+              response.esusuCancelled
+                  ? 'Invitation declined. Esusu was cancelled due to insufficient participants.'
+                  : 'You have declined the invitation',
+            ),
+            backgroundColor: Colors.grey[700],
+            duration: const Duration(seconds: 3),
           ),
         );
-        context.pop();
+
+        // Navigate to Hub (home)
+        context.go(AppRoutes.home);
       }
     } catch (e) {
       if (mounted) {

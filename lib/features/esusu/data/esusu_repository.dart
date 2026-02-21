@@ -245,6 +245,7 @@ class EsusuCommunityMember {
   final String role;
   final bool isAdmin;
   final bool isCurrentUser;
+  final bool hasActiveWallet;
 
   EsusuCommunityMember({
     required this.id,
@@ -256,7 +257,11 @@ class EsusuCommunityMember {
     required this.role,
     required this.isAdmin,
     this.isCurrentUser = false,
+    this.hasActiveWallet = false,
   });
+
+  /// Check if member is eligible for Esusu participation
+  bool get isEligibleForEsusu => hasActiveWallet;
 
   factory EsusuCommunityMember.fromJson(Map<String, dynamic> json) {
     return EsusuCommunityMember(
@@ -269,6 +274,7 @@ class EsusuCommunityMember {
       role: json['role'] ?? 'MEMBER',
       isAdmin: json['isAdmin'] ?? false,
       isCurrentUser: json['isCurrentUser'] ?? false,
+      hasActiveWallet: json['hasActiveWallet'] ?? false,
     );
   }
 }
@@ -316,6 +322,32 @@ class EsusuParticipant {
 }
 
 /// Create Esusu Request Model
+/// Commission type enum
+enum CommissionType {
+  cash,
+  percentage;
+
+  String toApiString() {
+    switch (this) {
+      case CommissionType.cash:
+        return 'CASH';
+      case CommissionType.percentage:
+        return 'PERCENTAGE';
+    }
+  }
+
+  static CommissionType fromString(String value) {
+    switch (value.toUpperCase()) {
+      case 'CASH':
+        return CommissionType.cash;
+      case 'PERCENTAGE':
+        return CommissionType.percentage;
+      default:
+        return CommissionType.cash;
+    }
+  }
+}
+
 class CreateEsusuRequest {
   final String communityId;
   final String name;
@@ -327,9 +359,12 @@ class CreateEsusuRequest {
   final DateTime participationDeadline;
   final DateTime collectionDate;
   final bool takeCommission;
-  final int? commissionPercentage;
+  final CommissionType? commissionType;
+  final int? commissionPercentage; // For percentage type (5-50)
+  final double? commissionAmount; // For cash type (fixed amount)
   final PayoutOrderType payoutOrderType;
   final List<EsusuParticipant> participants;
+  final int? adminSlot; // Admin's pre-selected slot (for FCFS when admin participates)
 
   CreateEsusuRequest({
     required this.communityId,
@@ -342,9 +377,12 @@ class CreateEsusuRequest {
     required this.participationDeadline,
     required this.collectionDate,
     required this.takeCommission,
+    this.commissionType,
     this.commissionPercentage,
+    this.commissionAmount,
     required this.payoutOrderType,
     required this.participants,
+    this.adminSlot,
   });
 
   Map<String, dynamic> toJson() {
@@ -359,10 +397,15 @@ class CreateEsusuRequest {
       'participationDeadline': participationDeadline.toIso8601String(),
       'collectionDate': collectionDate.toIso8601String(),
       'takeCommission': takeCommission,
-      if (takeCommission && commissionPercentage != null)
+      if (takeCommission && commissionType != null)
+        'commissionType': commissionType!.toApiString(),
+      if (takeCommission && commissionType == CommissionType.percentage && commissionPercentage != null)
         'commissionPercentage': commissionPercentage,
+      if (takeCommission && commissionType == CommissionType.cash && commissionAmount != null)
+        'commissionAmount': commissionAmount,
       'payoutOrderType': payoutOrderType.toApiString(),
       'participants': participants.map((p) => p.toJson()).toList(),
+      if (adminSlot != null) 'adminSlot': adminSlot,
     };
   }
 }
@@ -594,6 +637,36 @@ class EsusuRepository {
       throw Exception('Invalid response data');
     }
     return EsusuWaitingRoomDetails.fromJson(data);
+  }
+
+  /// Send reminders to pending participants
+  Future<RemindParticipantsResponse> remindPendingParticipants(String esusuId) async {
+    final response = await _apiClient.post(
+      ApiEndpoints.esusuRemind(esusuId),
+    );
+    return RemindParticipantsResponse.fromJson(response.data);
+  }
+}
+
+/// Remind Participants Response Model
+class RemindParticipantsResponse {
+  final bool success;
+  final String message;
+  final int remindersSent;
+
+  RemindParticipantsResponse({
+    required this.success,
+    required this.message,
+    required this.remindersSent,
+  });
+
+  factory RemindParticipantsResponse.fromJson(Map<String, dynamic> json) {
+    final data = json['data'] as Map<String, dynamic>?;
+    return RemindParticipantsResponse(
+      success: json['success'] ?? false,
+      message: json['message'] ?? '',
+      remindersSent: data?['remindersSent'] ?? 0,
+    );
   }
 }
 
@@ -876,18 +949,29 @@ class InvitationResponse {
   final String? esusuId;
   final String? esusuName;
   final PayoutOrderType? payoutOrderType;
+  final bool esusuCancelled;
 
   InvitationResponse({
     required this.accepted,
     this.esusuId,
     this.esusuName,
     this.payoutOrderType,
+    this.esusuCancelled = false,
   });
 
   factory InvitationResponse.fromJson(Map<String, dynamic> json, bool accepted) {
     final data = json['data'] as Map<String, dynamic>?;
 
-    if (!accepted || data == null) {
+    if (!accepted) {
+      // For decline response, check if Esusu was cancelled
+      final esusuCancelled = data?['esusuCancelled'] as bool? ?? false;
+      return InvitationResponse(
+        accepted: accepted,
+        esusuCancelled: esusuCancelled,
+      );
+    }
+
+    if (data == null) {
       return InvitationResponse(accepted: accepted);
     }
 
@@ -994,6 +1078,7 @@ class EsusuWaitingRoomDetails {
   final String frequency;
   final int targetMembers;
   final DateTime startDate;
+  final DateTime participationDeadline;
   final String status;
   final String payoutOrderType;
   final List<WaitingRoomParticipant> participants;
@@ -1007,6 +1092,7 @@ class EsusuWaitingRoomDetails {
     required this.frequency,
     required this.targetMembers,
     required this.startDate,
+    required this.participationDeadline,
     required this.status,
     required this.payoutOrderType,
     required this.participants,
@@ -1024,6 +1110,7 @@ class EsusuWaitingRoomDetails {
       frequency: json['frequency'] ?? 'Monthly',
       targetMembers: json['targetMembers'] ?? 0,
       startDate: DateTime.parse(json['startDate'] ?? DateTime.now().toIso8601String()),
+      participationDeadline: DateTime.parse(json['participationDeadline'] ?? DateTime.now().toIso8601String()),
       status: json['status'] ?? 'PENDING_MEMBERS',
       payoutOrderType: json['payoutOrderType'] ?? 'RANDOM',
       participants: participantsList

@@ -16,18 +16,23 @@ const Color _mainTextColor = Color(0xFF333333);
 
 /// Verify OTP Page (Verify Credentials Screen)
 ///
-/// Fourth step in wallet setup flow.
+/// Fourth step in wallet setup flow (or upgrade flow).
 /// User enters the 6-digit OTP sent to their email/phone.
 /// On verification, BVN details are retrieved and passed to next screen.
+///
+/// For Tier 1: Navigates to PIN creation
+/// For Tier 2 Upgrade: Navigates to next upgrade step (PERSONAL_INFO)
 class VerifyOtpPage extends ConsumerStatefulWidget {
   const VerifyOtpPage({
     super.key,
     required this.sessionId,
     required this.method,
+    this.isUpgrade = false,
   });
 
   final String sessionId;
   final String method; // 'phone' or 'email'
+  final bool isUpgrade; // True for Tier 2 upgrade flow
 
   @override
   ConsumerState<VerifyOtpPage> createState() => _VerifyOtpPageState();
@@ -139,32 +144,62 @@ class _VerifyOtpPageState extends ConsumerState<VerifyOtpPage>
 
     try {
       final walletRepo = ref.read(walletRepositoryProvider);
-      final response = await walletRepo.verifyBvnOtp(
-        sessionId: widget.sessionId,
-        otp: _otpController.text.trim(),
-      );
 
-      if (!mounted) return;
-
-      if (response.success) {
-        // Navigate to Verify Personal Info with BVN data
-        context.push(
-          AppRoutes.verifyPersonalInfo,
-          extra: {
-            'bvnData': {
-              'firstName': response.bvnData.firstName,
-              'lastName': response.bvnData.lastName,
-              'middleName': response.bvnData.middleName,
-              'phoneNumber': response.bvnData.phoneNumber,
-              'dateOfBirth': response.bvnData.dateOfBirth,
-              'gender': response.bvnData.gender,
-            },
-          },
+      if (widget.isUpgrade) {
+        // Tier 2 Upgrade flow: Use upgrade-specific endpoint
+        final response = await walletRepo.verifyUpgradeBvnOtp(
+          sessionId: widget.sessionId,
+          otp: _otpController.text.trim(),
         );
+
+        if (!mounted) return;
+
+        if (response.success) {
+          // Navigate to next upgrade step (PERSONAL_INFO) with BVN data
+          final nextStep = response.nextStep ?? 'PERSONAL_INFO';
+          _navigateToUpgradeStep(nextStep, bvnData: {
+            'firstName': response.bvnData.firstName,
+            'lastName': response.bvnData.lastName,
+            'middleName': response.bvnData.middleName,
+            'phoneNumber': response.bvnData.phoneNumber,
+            'dateOfBirth': response.bvnData.dateOfBirth,
+            'gender': response.bvnData.gender,
+          });
+        } else {
+          setState(() => _isLoading = false);
+          await _handleOtpError(response.message);
+          return;
+        }
       } else {
-        setState(() => _isLoading = false);
-        await _handleOtpError(response.message);
-        return;
+        // Tier 1 flow: Use standard endpoint
+        final response = await walletRepo.verifyBvnOtp(
+          sessionId: widget.sessionId,
+          otp: _otpController.text.trim(),
+        );
+
+        if (!mounted) return;
+
+        if (response.success) {
+          // Tier 1 flow: BVN verified - go directly to PIN creation
+          context.push(
+            AppRoutes.createTransactionPin,
+            extra: {
+              'verificationType': 'BVN',
+              'verificationData': {
+                'firstName': response.bvnData.firstName,
+                'lastName': response.bvnData.lastName,
+                'middleName': response.bvnData.middleName,
+                'phoneNumber': response.bvnData.phoneNumber,
+                'dateOfBirth': response.bvnData.dateOfBirth,
+                'gender': response.bvnData.gender,
+              },
+            },
+          );
+        } else {
+          setState(() => _isLoading = false);
+          await _handleOtpError(response.message);
+          return;
+        }
       }
     } catch (e) {
       if (!mounted) return;
@@ -180,6 +215,35 @@ class _VerifyOtpPageState extends ConsumerState<VerifyOtpPage>
     }
   }
 
+  /// Navigate to the appropriate upgrade step
+  void _navigateToUpgradeStep(String step, {Map<String, dynamic>? bvnData}) {
+    switch (step) {
+      case 'PERSONAL_INFO':
+        context.push(
+          AppRoutes.upgradePersonalInfo,
+          extra: {'bvnData': bvnData},
+        );
+        break;
+      case 'ID_DOCUMENT':
+        context.push(AppRoutes.upgradeIdDocument);
+        break;
+      case 'FACE_VERIFICATION':
+        context.push(AppRoutes.upgradeFace);
+        break;
+      case 'ADDRESS':
+        context.push(AppRoutes.upgradeAddress);
+        break;
+      case 'SUBMITTED':
+        context.go(AppRoutes.upgradePending);
+        break;
+      default:
+        context.push(
+          AppRoutes.upgradePersonalInfo,
+          extra: {'bvnData': bvnData},
+        );
+    }
+  }
+
   Future<void> _onResend() async {
     if (!_canResend || _isResending) return;
 
@@ -189,18 +253,36 @@ class _VerifyOtpPageState extends ConsumerState<VerifyOtpPage>
 
     try {
       final walletRepo = ref.read(walletRepositoryProvider);
-      final response = await walletRepo.verifyBvnMethod(
-        sessionId: widget.sessionId,
-        method: widget.method,
-      );
 
-      if (!mounted) return;
+      // Use upgrade-specific endpoint if in upgrade mode
+      if (widget.isUpgrade) {
+        final response = await walletRepo.verifyUpgradeBvnMethod(
+          sessionId: widget.sessionId,
+          method: widget.method,
+        );
 
-      if (response.success) {
-        _showSuccess('Verification code resent successfully');
-        _startResendTimer();
+        if (!mounted) return;
+
+        if (response.success) {
+          _showSuccess('Verification code resent successfully');
+          _startResendTimer();
+        } else {
+          _showError(response.message);
+        }
       } else {
-        _showError(response.message);
+        final response = await walletRepo.verifyBvnMethod(
+          sessionId: widget.sessionId,
+          method: widget.method,
+        );
+
+        if (!mounted) return;
+
+        if (response.success) {
+          _showSuccess('Verification code resent successfully');
+          _startResendTimer();
+        } else {
+          _showError(response.message);
+        }
       }
     } catch (e) {
       if (!mounted) return;

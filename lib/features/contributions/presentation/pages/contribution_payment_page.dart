@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:finsquare_mobile_app/config/theme/app_theme.dart';
 import 'package:finsquare_mobile_app/config/routes/app_router.dart';
 import 'package:finsquare_mobile_app/core/widgets/back_button.dart';
+import 'package:finsquare_mobile_app/features/contributions/data/contributions_repository.dart';
 import 'package:finsquare_mobile_app/features/contributions/presentation/widgets/contribution_pin_modal.dart';
 import 'package:finsquare_mobile_app/features/wallet/presentation/providers/wallet_provider.dart';
 
@@ -15,19 +16,12 @@ const Color _greyTextColor = Color(0xFF606060);
 const Color _mainTextColor = Color(0xFF333333);
 const Color _borderColor = Color(0xFFE0E0E0);
 
-/// Payment contribution type enum (for payment flow)
-enum PaymentContributionType {
-  fixed,
-  flexible,
-  target,
-}
-
 class ContributionPaymentPage extends ConsumerStatefulWidget {
   final String contributionId;
   final String contributionName;
   final String recipientName;
   final double amount; // For fixed: the fixed amount, For target: the target amount
-  final PaymentContributionType contributionType;
+  final ContributionType contributionType;
   final double? contributedSoFar; // For target type only
 
   const ContributionPaymentPage({
@@ -36,7 +30,7 @@ class ContributionPaymentPage extends ConsumerStatefulWidget {
     required this.contributionName,
     required this.recipientName,
     required this.amount,
-    this.contributionType = PaymentContributionType.fixed,
+    this.contributionType = ContributionType.fixed,
     this.contributedSoFar,
   });
 
@@ -70,14 +64,14 @@ class _ContributionPaymentPageState
   }
 
   double get _currentAmount {
-    if (widget.contributionType == PaymentContributionType.fixed) {
+    if (widget.contributionType == ContributionType.fixed) {
       return widget.amount;
     }
     return double.tryParse(_enteredAmount) ?? 0;
   }
 
   double get _remainingTarget {
-    if (widget.contributionType == PaymentContributionType.target) {
+    if (widget.contributionType == ContributionType.target) {
       return widget.amount - (widget.contributedSoFar ?? 0);
     }
     return 0;
@@ -154,7 +148,7 @@ class _ContributionPaymentPageState
   @override
   Widget build(BuildContext context) {
     // For fixed type, use the original UI
-    if (widget.contributionType == PaymentContributionType.fixed) {
+    if (widget.contributionType == ContributionType.fixed) {
       return _buildFixedAmountUI();
     }
 
@@ -353,7 +347,7 @@ class _ContributionPaymentPageState
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   // Target progress info (only for target type)
-                  if (widget.contributionType == PaymentContributionType.target) ...[
+                  if (widget.contributionType == ContributionType.target) ...[
                     _buildTargetProgressInfo(),
                     const SizedBox(height: 24),
                   ],

@@ -7,16 +7,13 @@ import 'package:finsquare_mobile_app/config/routes/app_router.dart';
 import 'package:finsquare_mobile_app/config/theme/app_theme.dart';
 import 'package:finsquare_mobile_app/core/widgets/back_button.dart';
 import 'package:finsquare_mobile_app/core/widgets/custom_text_field.dart';
-import 'package:finsquare_mobile_app/features/contributions/data/contributions_repository.dart';
 import 'package:finsquare_mobile_app/features/contributions/presentation/providers/contribution_creation_provider.dart';
-import 'package:finsquare_mobile_app/features/contributions/presentation/pages/create_contribution_page.dart'
-    as create_page;
 
 // Contribution brand colors
 const Color _contributionPrimary = Color(0xFFF83181);
 
 class ConfigureContributionPage extends ConsumerStatefulWidget {
-  final create_page.ContributionType? contributionType;
+  final ContributionType? contributionType;
   final String? contributionName;
   final String? contributionDescription;
   final String? imagePath;
@@ -59,19 +56,9 @@ class _ConfigureContributionPageState
   }
 
   void _setTypeInProvider() {
-    final notifier = ref.read(contributionCreationProvider.notifier);
-    switch (widget.contributionType) {
-      case create_page.ContributionType.fixedAmount:
-        notifier.setType(ContributionType.fixed);
-        break;
-      case create_page.ContributionType.targetContribution:
-        notifier.setType(ContributionType.target);
-        break;
-      case create_page.ContributionType.flexible:
-        notifier.setType(ContributionType.flexible);
-        break;
-      case null:
-        break;
+    if (widget.contributionType != null) {
+      final notifier = ref.read(contributionCreationProvider.notifier);
+      notifier.setType(widget.contributionType!);
     }
   }
 
@@ -99,7 +86,7 @@ class _ConfigureContributionPageState
   }
 
   bool get _isFormValid {
-    if (widget.contributionType == create_page.ContributionType.flexible) {
+    if (widget.contributionType == ContributionType.flexible) {
       return _startDate != null && (_isCommunityWalletSelected || _selectedMember != null);
     }
     return _amountController.text.trim().isNotEmpty &&
@@ -109,11 +96,11 @@ class _ConfigureContributionPageState
 
   String get _amountFieldLabel {
     switch (widget.contributionType) {
-      case create_page.ContributionType.fixedAmount:
+      case ContributionType.fixed:
         return 'Contribution amount';
-      case create_page.ContributionType.targetContribution:
+      case ContributionType.target:
         return 'Target amount';
-      case create_page.ContributionType.flexible:
+      case ContributionType.flexible:
       case null:
         return 'Amount';
     }
@@ -121,18 +108,18 @@ class _ConfigureContributionPageState
 
   String get _amountFieldDescription {
     switch (widget.contributionType) {
-      case create_page.ContributionType.fixedAmount:
+      case ContributionType.fixed:
         return 'Amount each participant must contribute';
-      case create_page.ContributionType.targetContribution:
+      case ContributionType.target:
         return 'Total target amount to be achieved collectively';
-      case create_page.ContributionType.flexible:
+      case ContributionType.flexible:
       case null:
         return '';
     }
   }
 
   bool get _showAmountField {
-    return widget.contributionType != create_page.ContributionType.flexible;
+    return widget.contributionType != ContributionType.flexible;
   }
 
   Future<void> _selectDate({required bool isStartDate}) async {

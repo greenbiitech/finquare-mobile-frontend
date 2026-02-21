@@ -29,6 +29,7 @@ class EsusuDetailPage extends ConsumerStatefulWidget {
 class _EsusuDetailPageState extends ConsumerState<EsusuDetailPage> {
   int _selectedTabIndex = 0; // 0 = Accepted, 1 = Pending, 2 = Declined
   bool _isLoading = true;
+  bool _isReminding = false;
   String? _error;
   EsusuWaitingRoomDetails? _details;
 
@@ -136,6 +137,43 @@ class _EsusuDetailPageState extends ConsumerState<EsusuDetailPage> {
         return 'rd';
       default:
         return 'th';
+    }
+  }
+
+  Future<void> _remindParticipants() async {
+    if (_isReminding) return;
+
+    setState(() {
+      _isReminding = true;
+    });
+
+    try {
+      final repository = ref.read(esusuRepositoryProvider);
+      final response = await repository.remindPendingParticipants(widget.esusuId);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(response.message),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to send reminders: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isReminding = false;
+        });
+      }
     }
   }
 
@@ -289,18 +327,12 @@ class _EsusuDetailPageState extends ConsumerState<EsusuDetailPage> {
           Padding(
             padding: const EdgeInsets.all(20.0),
             child: DefaultButton(
-              isButtonEnabled: true,
-              onPressed: () {
-                // TODO: Implement remind participants
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Reminder sent to pending participants'),
-                    backgroundColor: Colors.green,
-                  ),
-                );
-              },
+              isButtonEnabled: !_isReminding,
+              loading: _isReminding,
+              onPressed: _remindParticipants,
               title: 'Remind participants',
               buttonColor: _esusuPrimaryColor,
+              loadingIndicatorColor: _esusuPrimaryColor,
               height: 54,
             ),
           ),

@@ -12,7 +12,7 @@ const Color _mainTextColor = Color(0xFF333333);
 
 /// Select Verification Method Page
 ///
-/// Second step in wallet setup flow.
+/// Second step in wallet setup flow (or upgrade flow).
 /// User selects how they want to receive the OTP verification code.
 /// No API call here - just navigation to Verify BVN Credentials.
 class SelectVerificationMethodPage extends ConsumerStatefulWidget {
@@ -20,10 +20,12 @@ class SelectVerificationMethodPage extends ConsumerStatefulWidget {
     super.key,
     required this.sessionId,
     required this.methods,
+    this.isUpgrade = false,
   });
 
   final String sessionId;
   final List<BvnMethodOption> methods;
+  final bool isUpgrade; // True for Tier 2 upgrade flow
 
   @override
   ConsumerState<SelectVerificationMethodPage> createState() =>
@@ -34,10 +36,27 @@ class _SelectVerificationMethodPageState
     extends ConsumerState<SelectVerificationMethodPage> {
   int _selectedIndex = 0;
 
-  void _onContinue() {
-    if (widget.methods.isEmpty) return;
+  /// Filter out methods with invalid Nigerian phone prefixes (2340, 2341, etc.)
+  /// Valid prefixes: 2347, 2348, 2349 (or 07, 08, 09)
+  List<BvnMethodOption> get _validMethods {
+    return widget.methods.where((method) {
+      final hint = method.hint.toLowerCase();
+      // Check if this is a phone method with an invalid prefix
+      // Invalid pattern: contains "2340", "2341", "2342", "2343", "2344", "2345", "2346"
+      final invalidPrefixes = ['2340', '2341', '2342', '2343', '2344', '2345', '2346'];
+      for (final prefix in invalidPrefixes) {
+        if (hint.contains(prefix)) {
+          return false; // Exclude this method
+        }
+      }
+      return true; // Keep this method
+    }).toList();
+  }
 
-    final selectedMethod = widget.methods[_selectedIndex];
+  void _onContinue() {
+    if (_validMethods.isEmpty) return;
+
+    final selectedMethod = _validMethods[_selectedIndex];
 
     // Navigate to Verify BVN Credentials with session data
     // Pass only the method string (e.g. 'phone' or 'email'), not the whole object
@@ -46,6 +65,7 @@ class _SelectVerificationMethodPageState
       extra: {
         'sessionId': widget.sessionId,
         'method': selectedMethod.method,
+        'isUpgrade': widget.isUpgrade,
       },
     );
   }
@@ -88,8 +108,8 @@ class _SelectVerificationMethodPageState
                 ),
                 const SizedBox(height: 30),
 
-                // Radio Options
-                if (widget.methods.isEmpty)
+                // Radio Options (filtered to exclude invalid phone numbers)
+                if (_validMethods.isEmpty)
                   Text(
                     'No verification methods available.',
                     style: TextStyle(
@@ -99,8 +119,8 @@ class _SelectVerificationMethodPageState
                     ),
                   )
                 else
-                  ...List.generate(widget.methods.length, (index) {
-                    final method = widget.methods[index];
+                  ...List.generate(_validMethods.length, (index) {
+                    final method = _validMethods[index];
                     return Column(
                       children: [
                         InkWell(
@@ -162,7 +182,7 @@ class _SelectVerificationMethodPageState
           height: 54,
           child: ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: widget.methods.isNotEmpty
+              backgroundColor: _validMethods.isNotEmpty
                   ? AppColors.primary
                   : AppColors.surfaceVariant,
               elevation: 0,
@@ -170,14 +190,14 @@ class _SelectVerificationMethodPageState
                 borderRadius: BorderRadius.circular(43),
               ),
             ),
-            onPressed: widget.methods.isNotEmpty ? _onContinue : null,
+            onPressed: _validMethods.isNotEmpty ? _onContinue : null,
             child: Text(
               'Continue',
               style: TextStyle(
                 fontFamily: AppTextStyles.fontFamily,
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
-                color: widget.methods.isNotEmpty
+                color: _validMethods.isNotEmpty
                     ? Colors.white
                     : AppColors.textDisabled,
               ),
